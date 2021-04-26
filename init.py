@@ -24,42 +24,40 @@ def extract_corpus(infile):
       pass #TODO : parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)O
   return doc
 
-test_corpus = ["This is a test .","And a second test !", "Ok that's enough now ."]
 
+def get_tokens_and_indices(doc, minimum_frequency = 0.0):
+  """Tokenizes the document and generates vocabulary indexes from it.
 
-def get_tokens(doc):
-  """Tokenizes the document and generates a full vocabulary list from it.
   -> doc: list of strings (sentences)
-  <- tokens: list of lists of strings
-  """
-  tokens = []
-  for sentence in doc:
-    tokens_sentence = sentence.split()
-    tokens.append(tokens_sentence)
-  return tokens # TODO est-ce qu'on veut compter les occurences là ? ça serait facile de faire de vocab un dico de compte
-
-tokens = get_tokens(test_corpus)
-
-
-def get_i2w_and_w2i(tokens, minimum_frequency = 0.0):
-  """Generates an indexed vocabulary, filtering out rare words.
-  -> tokens: list of lists (sentences) of strings (words)
   -> minimum_frequency: frequency threshold under which words are ignored
-  <- iw2: list, iw2[index(int)] = "word"
+
+  <- tokens: list of lists of strings
+  <- i2w: list, iw2[index(int)] = "word"
   <- w2i: doc, w2i["word"] = index(int)
   """
-  flat_doc = join(tokens)
-  total_occurences = flat_doc.len()
-  full_vocab = set(flat_doc)
-  vocab = set(["UNK"] + ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)])
-  for word in full_vocab:
-    if flat_doc.count(word)/total_occurences > minimum_frequency:
-      vocab.append(word)
+  tokens = []
+  flat_doc = []
+  vocab = set()
+
+  for sentence in doc:
+    tokens_sentence = sentence.split()
+    vocab = vocab.union(set(tokens_sentence))
+    tokens.append(tokens_sentence)
+    flat_doc = flat_doc + tokens_sentence
+
+  total_occurences = len(flat_doc)
+  for word in vocab:
+    if flat_doc.count(word)/total_occurences < minimum_frequency:
+      vocab.remove(word)
+
+  vocab = vocab.union(set(["UNK"] + ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]))
   i2w = list(vocab)
   w2i = {w: i for i, w in enumerate(i2w)}
-  return i2w, w2i
+  return tokens, i2w, w2i
 
-i2w, w2i = get_i2w_and_w2i(tokens)
+
+test_corpus = ["This is a test .","And a second test !", "Ok that's enough now ."]
+tokens, i2w, w2i = get_tokens_and_indices(test_corpus)
 
 
 #Création des exemples d'apprentissage avec negative sampling
