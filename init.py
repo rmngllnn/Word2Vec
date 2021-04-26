@@ -26,7 +26,7 @@ def extract_corpus(infile):
 
 
 def get_tokens_and_indices(doc, minimum_frequency = 0.0):
-  """Tokenizes the document and generates a full vocabulary list from it.
+  """Tokenizes the document and generates vocabulary indexes from it.
 
   -> doc: list of strings (sentences)
   -> minimum_frequency: frequency threshold under which words are ignored
