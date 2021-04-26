@@ -14,6 +14,7 @@ tokens = []
 vocab = set(['D1','D2','F1','F2'])
 #TODO : remplir la liste du vocabulaire vocab avec le corpus, séparer en tokens et remplir tokens
 #TODO : avec une fonction, ouvrir le fichier donné par le parser, parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)
+#Aussi, compter les occurrences de mots et trier selon un seuil de fréquence
 def fill_vocab(infile) :
   pass
 
