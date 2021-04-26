@@ -11,7 +11,7 @@ torch.manual_seed(1)
 CONTEXT_SIZE = 2 #pour commencer
 EMBEDDING_DIM = 10 #pour commencer
 tokens = []
-vocab = set(['D1','D2','F1','F2'])
+vocab = set(["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]))
 #TODO : remplir la liste du vocabulaire vocab avec le corpus, séparer en tokens et remplir tokens
 #TODO : avec une fonction, ouvrir le fichier donné par le parser, parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)
 #Aussi, compter les occurrences de mots et trier selon un seuil de fréquence
