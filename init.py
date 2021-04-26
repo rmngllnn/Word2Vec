@@ -25,8 +25,9 @@ i2w = list(vocab)
 w2i = {w: i for i, w in enumerate(i2w)}
 
 #Création des exemples d'apprentissage avec negative sampling
+#Aussi, création des classes gold 1/0 (ou 1/-1) dans une liste de même taille que vocab (note Romy : pas sûre...)
 def create_examples (tokens, w2i) :
-  """Un exemple est une paire (liste de mots contexte, mot cible), la sortie est une liste d'exemple de taille len(vocab)"""
+  """Un exemple est une paire (liste de mots contexte, mot cible), la sortie est une liste d'exemple de taille len(vocab) et une liste des classes gold"""
   pass #TO DO
 
 examples = create_examples(tokens, w2i)
