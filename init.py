@@ -1,4 +1,4 @@
-#Dans ce fichier, on se propose d'initialiser l'implémentation du modèle word2vec, en exploitant la corpus (extraction, indices, nettoyage, embeddings)
+#Dans ce fichier, on se propose d'initialiser l'implémentation du modèle word2vec, en exploitant le corpus (extraction, indices, nettoyage, embeddings)
 #(Très) inspiré TP8
 import torch
 import torch.nn as nn
