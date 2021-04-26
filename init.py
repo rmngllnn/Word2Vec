@@ -10,7 +10,6 @@ torch.manual_seed(1)
 
 CONTEXT_SIZE = 2 #pour commencer
 EMBEDDING_DIM = 10 #pour commencer
-test_corpus = [["This is a test ."],["And a second test !"], ["Ok that's enough now ."]]
 
 
 def extract_corpus(infile):
@@ -20,13 +19,15 @@ def extract_corpus(infile):
   <- doc: list (doc) of strings (sentences)
   """
   doc = []
-  with f as open(infile, 'r'):
+  with open(infile, 'r') as f:
     for line in f.readlines():
       pass #TODO : parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)O
   return doc
 
+test_corpus = ["This is a test .","And a second test !", "Ok that's enough now ."]
 
-def get_tokens(doc = test_corpus):
+
+def get_tokens(doc):
   """Tokenizes the document and generates a full vocabulary list from it.
   -> doc: list of strings (sentences)
   <- tokens: list of lists of strings
@@ -36,6 +37,8 @@ def get_tokens(doc = test_corpus):
     tokens_sentence = sentence.split()
     tokens.append(tokens_sentence)
   return tokens # TODO est-ce qu'on veut compter les occurences là ? ça serait facile de faire de vocab un dico de compte
+
+tokens = get_tokens(test_corpus)
 
 
 def get_i2w_and_w2i(tokens, minimum_frequency = 0.0):
@@ -55,6 +58,8 @@ def get_i2w_and_w2i(tokens, minimum_frequency = 0.0):
   i2w = list(vocab)
   w2i = {w: i for i, w in enumerate(i2w)}
   return i2w, w2i
+
+i2w, w2i = get_i2w_and_w2i(tokens)
 
 
 #Création des exemples d'apprentissage avec negative sampling
