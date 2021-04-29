@@ -19,9 +19,16 @@ def extract_corpus(infile):
   <- doc: list (doc) of strings (sentences)
   """
   doc = []
-  with open(infile, 'r') as f:
+  with open(infile, 'r', encoding = "utf-8-sig) as f:
     for line in f.readlines():
-      pass #TODO : parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)O
+      lines = line.split()
+			
+      #deleting pos from the token
+      for tok in lines:
+      	t = tok.split("/")
+	t.remove(t[1])
+	doc.append(t[0]) #si on veut enlever les majuscules -> t[0].lower()
+      #pass #TODO : parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)O
   return doc
 
 
