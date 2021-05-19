@@ -112,14 +112,24 @@ def create_examples (tokens, w2i, occurencies_word) :
     sent = []
     gold_sent = []
     length = len(sentence)
-    for i in range(len(sentence)):
+    for i in range(length):
       for k in range(1,CONTEXT_SIZE+1) :
-        if i-k >= 0 and i+k < length :
+        if i-k >= 0 :
           sent.append((w2i[sentence[i-k]], w2i[sentence[i]]))
           gold_sent.append(1)
+        elif i-k < 0 :
+          j = i-k+CONTEXT_SIZE+1
+          D = '*D'+str(j)+'*'
+          sent.append((w2i[D], w2i[sentence[i]]))
+          gold_sent.append(1)
+        if i+k < length :
           sent.append((w2i[sentence[i+k]], w2i[sentence[i]]))
           gold_sent.append(1)
-        #TODO Romy : traiter les mots en début et fin de phrase avec un else
+        elif i+k >= length :
+          j = i+k-length+1
+          F = '*F'+str(j)+'*'
+          sent.append((w2i[F], w2i[sentence[i]]))
+          
       for j in range(NEGATIVE_EXAMPLE) :
         negative_rand_ex = np.random.choice(list(distribution_prob.keys()), p= list(distribution_prob.values()))
         sent.append((w2i[negative_rand_ex], w2i[sentence[i]]))
