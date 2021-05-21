@@ -30,55 +30,59 @@ def extract_corpus(infile):
   with open(infile, 'r', encoding = "utf-8-sig") as f:
     for line in f.readlines():
       lines = line.split()
-      sentence = ""
+      sentence = []
 			
-      #deleting pos from the token
+      # deleting pos from the token
       for tok in lines :
         t = tok.split("/")
         t.remove(t[1])
-        sentence += t[0] + " " #si on veut enlever les majuscules -> t[0].lower()
-      doc.append(sentence) 
-      #pass #TODO : parcourir chaque ligne, supprimer les tags, gérer ou non les majuscules, attention à l'encodage (UTF-8)O
+        sentence.append(t[0]) # Tokenisation... #si on veut enlever les majuscules -> t[0].lower()
+      doc.append(sentence)
   return doc
 
-
 def get_indices(doc):
-  """Tokenizes the document, generates the vocabulary list and an occurence count of each token in the vocabulary.
+  """Tokenizes the document and generates the vocabulary.
 
-  -> doc: list (doc) of strings (sentences)
+  -> doc: list (doc) of lists (sentences) of strings (sentences)
 
-  <- tokens: list (doc) of lists (sentences) of strings (words)
+  <- tokens: list of lists of strings
   <- i2w: list, i2w[index(int)] = "word"
   <- w2i: dict, w2i["word"] = index(int)
-  <- occurence_count : matrix, occurence_count[index(int)] = occurence_count(int)
+  <- occurences_counter : dict, occurences_word["word"] = occurence_count(int)
   """
-  vectorizer = CountVectorizer(input=doc, max_features=VOCAB_SIZE, token_pattern=r"(?u)\b\w+\b")
-  # max_features to only keep VOCAB_SIZE tokens, token pattern to keep one-letter words
-  # cf https://www.studytonight.com/post/scikitlearn-countvectorizer-in-nlp and https://investigate.ai/text-analysis/counting-words-with-scikit-learns-countvectorizer/ 
-  occurence_count = vectorizer.fit_transform(doc)
-  
-  i2w = vectorizer.get_feature_names()
+  occurences_counter = Counter() # We want to count the number of occurences of each token, to only keep the VOCAB_SIZE most common ones.
+
+  for sentence in doc:
+    occurences_counter.update(sentence) # cf https://docs.python.org/3/library/collections.html#collections.Counter
+
+  i2w = [token for (token, count) in occurences_counter.most_common(VOCAB_SIZE)] # The VOCAB_SIZE most common tokens will make up our vocabulary.
+
+  if len(occurences_counter.keys()) - VOCAB_SIZE > 0: # If there are tokens left over...
+    #print("total:"+str(occurences_counter))
+    UNK_counter = {token : count for (token, count) in occurences_counter.most_common()[VOCAB_SIZE:]} # (it's a dict not a counter but shrug)
+    #print("unk: "+str(UNK_counter))
+    occurences_counter.subtract(UNK_counter) # all those other tokens are deleted from the occurence count...
+    #print("after subtract:"+str(occurences_counter))
+    occurences_counter.update({"UNK": sum([UNK_counter[token] for token in UNK_counter])}) # and added as occurences of UNK.
+
+  occurences_counter.update({spec_word : len(doc) for spec_word in ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]})
+
   i2w = i2w + ["UNK"] + ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]
-  # The final vocab size is actually VOCAB_SIZE + 1 + 2*CONTEXT_SIZE to account for UNK, D1, etc.
-  # TODO est-ce que c'est bien ça qu'on veut ?
-  # TODO potentiel : si on crée notre propre foncction tokenize, on peut la mettre en argument (tokenizer=function)
+  # The final vocab is actually VOCAB_SIZE + 1 + 2*CONTEXT_SIZE sized to account for UNK, D1, etc. # TODO est-ce que c'est bien ça qu'on veut ?
   
-  w2i = {w: i for i, w in enumerate(i2w)} # From the list of tokens in our vocabulary, we build the reverse index, token -> index number.
+  w2i = {w: i for i, w in enumerate(i2w)} # From the list of tokens in out vocabulary, we built the reverse index, token -> index number.
 
-  tokenizer = vectorizer.build_tokenizer()
-  tokens = [tokenizer(sentence) for sentence in doc]
+  return i2w, w2i, occurences_counter # A Counter will give a count of 0 for an unknown word, a dict will not.
 
-  return tokens, i2w, w2i, np.array(occurence_count.toarray()).sum(0)
-  # TODO Cécile : euh est-ce que c'est bien ce qu'on veut ? vérifier la dimension de la sum
 
 # notes Cécile : il faut passer à une représentation matricielle du corpus avant ou après la création des exemples ?
 
 
-test_corpus = ["This is a test.", "Test."]
-tokens, i2w, w2i, occurences_word = get_indices(test_corpus)
+doc = [["This","is","a", "test", "."], ["Test","."]]
+i2w, w2i, occurences_word = get_indices(doc)
 
 
-def create_examples (tokens, w2i, occurences_word) :
+def create_examples (tokens, w2i, occurences_word):
   """Creates positive and negative examples using negative sampling.
   An example is a (context word, target word) pair.
   
@@ -94,53 +98,49 @@ def create_examples (tokens, w2i, occurences_word) :
   gold_classes = []
   distribution_prob = {}
 
-  print(occurences_word)
-  total_number_tok = 0
+  total_number_tok = 0 # TODO à adapter avec objet Counter (counter.elements, trucs du genre)
   for index in range(0, VOCAB_SIZE):
     total_number_tok += occurences_word[index]**SAMPLING
   for index in range(0, VOCAB_SIZE):
-    distribution_prob[i2w[index]] = (occurences_word[index]**SAMPLING)/total_number_tok # ça ça prend pas en compte les mots UNK
-    #ils ont pas été comptés par le countvectorizer, je sais pas is c'est un problème ou non
+    distribution_prob[i2w[index]] = (occurences_word[index]**SAMPLING)/total_number_tok
+
+    #TODO ajouter D, F etc au corpus pour les compter
   
   
   for sentence in tokens:
-    sent = []
-    gold_sent = []
     length = len(sentence)
     for i in range(length):
       print("word: "+sentence[i])
       for k in range(1,CONTEXT_SIZE+1):
         if i-k >= 0:
           print("example: ("+sentence[i-k]+","+sentence[i]+")")
-          sent.append((w2i[sentence[i-k]], w2i[sentence[i]]))
-          gold_sent.append(1)
+          examples.append((w2i[sentence[i-k]], w2i[sentence[i]]))
+          gold_classes.append(1)
         elif i-k < 0:
           j = i-k+CONTEXT_SIZE+1
           D = '*D'+str(j)+'*'
           print("example: ("+D+","+sentence[i]+")")
-          sent.append((w2i[D], w2i[sentence[i]]))
-          gold_sent.append(1)
+          examples.append((w2i[D], w2i[sentence[i]]))
+          gold_classes.append(1)
         if i+k < length:
           print("example: ("+sentence[i+k]+","+sentence[i]+")")
-          sent.append((w2i[sentence[i+k]], w2i[sentence[i]]))
-          gold_sent.append(1)
+          examples.append((w2i[sentence[i+k]], w2i[sentence[i]]))
+          gold_classes.append(1)
         elif i+k >= length:
           j = i+k-length+1
           F = '*F'+str(j)+'*'
           print("example: "+F+","+sentence[i]+")")
-          sent.append((w2i[F], w2i[sentence[i]]))
+          examples.append((w2i[F], w2i[sentence[i]]))
+          gold_classes.append(1)
           
       for j in range(NEGATIVE_EXAMPLE):
         negative_rand_ex = np.random.choice(list(distribution_prob.keys()), p=list(distribution_prob.values()))
-        sent.append((w2i[negative_rand_ex], w2i[sentence[i]]))
-        gold_sent.append(-1)
-    examples.append(sent)
-    gold_classes.append(gold_sent)
-
+        examples.append((w2i[negative_rand_ex], w2i[sentence[i]]))
+        gold_classes.append(-1)
   
   return examples, gold_classes
 
-examples = create_examples(tokens, w2i, occurences_word)
+examples = create_examples(doc, w2i, occurences_word)
 print("Examples: "+str(examples))
 
 
