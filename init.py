@@ -1,5 +1,7 @@
-#Dans ce fichier, on se propose d'initialiser l'implémentation du modèle word2vec, en exploitant le corpus (extraction, indices, nettoyage, embeddings)
-#(Très) inspiré TP8
+"""Dans ce fichier, on se propose d'initialiser l'implémentation du modèle word2vec, en exploitant le corpus (extraction, indexes, nettoyage, embeddings)
+(Très) inspiré du TP8 du cours d'apprentissage automatique 2 de Marie Candito
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,140 +9,151 @@ import torch.optim as optim
 import argparse
 import numpy as np
 from collections import Counter
-from sklearn.feature_extraction.text import CountVectorizer
-
 
 torch.manual_seed(1)
 
-CONTEXT_SIZE = 2 #pour commencer
-EMBEDDING_DIM = 10 #pour commencer
+# TODO plus tard, ça c'est pour commencer
+CONTEXT_SIZE = 2 # If CONTEXT_SIZE = 2, then for each word, four positive examples are created: (x-2,x), (x-1,x), (x+1,x), (x+2,x).
+EMBEDDING_DIM = 10
 SAMPLING = 0.75
-NEGATIVE_EXAMPLE = 3
+NEGATIVE_EXAMPLE = 3 # If NEGATIVE_EXAMPLE = 2, then for each word, two negative examples are randomly created.
 VOCAB_SIZE = 2
 
 
 def extract_corpus(infile):
-  """Extracts the corpus, cleans it up.
+  """Extracts the corpus, gets rid of the POS tags, tokenizes.
   Calibrated for the "L'Est républicain" corpus, cf README for the original download links.
 
   -> infile: string, path to the file
-  <- doc: list (doc) of strings (sentences)
+  <- tokenized_doc: list of lists of strings, a tokenized doc made of sentences made of words
   """
-  doc = []
+  tokenized_doc = []
   with open(infile, 'r', encoding = "utf-8-sig") as f:
     for line in f.readlines():
-      lines = line.split()
       sentence = []
-			
-      # deleting pos from the token
-      for tok in lines :
-        t = tok.split("/")
-        t.remove(t[1])
-        sentence.append(t[0]) # Tokenisation... #si on veut enlever les majuscules -> t[0].lower()
-      doc.append(sentence)
-  return doc
+      
+      for word in line.split():
+        sentence.append(word.split("/")[0])
+      tokenized_doc.append(sentence)
+  return tokenized_doc
 
-def get_indices(doc):
-  """Tokenizes the document and generates the vocabulary.
 
-  -> doc: list (doc) of lists (sentences) of strings (sentences)
+def get_indexes_and_counter(tokenized_doc):
+  """Generates the vocabulary indexes and the occurence count with only the VOCAB_SIZE most common words and the special words.
+  This means the final vocabuary has a size of (VOCAB_SIZE + 1 + 2*CONTEXT_SIZE).
+  Special words: UNK, *D1*, ...
 
-  <- tokens: list of lists of strings
-  <- i2w: list, i2w[index(int)] = "word"
-  <- w2i: dict, w2i["word"] = index(int)
-  <- occurences_counter : dict, occurences_word["word"] = occurence_count(int)
+  Note: We did consider using CountVectorizer, but couldn't figure out how to deal with unknown words, which we do want to count
+  too, because we need to create negative examples with them to create the other embeddings, and we need their distribution for
+  that. TODO: double check, do we?
+  Also, a Counter will give a count of 0 for an unknown word and a dict will not, which might be useful at some point, so we kept the Counter. TODO: double check at the end, does it help or not?
+
+  -> tokenized_doc: list of lists of strings, a tokenized doc made of sentences made of words, as created by extract_corpus()
+
+  <- i2w: list, index to word translator, i2w[index(int)] = "word"
+  <- w2i: dict, word to index translator, w2i["word"] = index(int)
+  <- occurence_counter : Counter object, occurence_counter["word"] = occurence_count(int)
   """
-  occurences_counter = Counter() # We want to count the number of occurences of each token, to only keep the VOCAB_SIZE most common ones.
+  occurence_counter = Counter() # We want to count the number of occurences of each token, to only keep the VOCAB_SIZE most common ones.
 
-  for sentence in doc:
-    occurences_counter.update(sentence) # cf https://docs.python.org/3/library/collections.html#collections.Counter
+  for sentence in tokenized_doc:
+    occurence_counter.update(sentence) # cf https://docs.python.org/3/library/collections.html#collections.Counter
 
-  i2w = [token for (token, count) in occurences_counter.most_common(VOCAB_SIZE)] # The VOCAB_SIZE most common tokens will make up our vocabulary.
+  i2w = [token for (token, count) in occurence_counter.most_common(VOCAB_SIZE)] # The VOCAB_SIZE most common tokens will make up our real-words vocabulary.
 
-  if len(occurences_counter.keys()) - VOCAB_SIZE > 0: # If there are tokens left over...
-    #print("total:"+str(occurences_counter))
-    UNK_counter = {token : count for (token, count) in occurences_counter.most_common()[VOCAB_SIZE:]} # (it's a dict not a counter but shrug)
+  if len(occurence_counter.keys()) - VOCAB_SIZE > 0: # If there are tokens left over...
+    #print("total:"+str(occurence_counter))
+    UNK_counter = {token : count for (token, count) in occurence_counter.most_common()[VOCAB_SIZE:]} # (it's actually a dict not a counter but shrug, doesn't matter for what we're doing with it)
     #print("unk: "+str(UNK_counter))
-    occurences_counter.subtract(UNK_counter) # all those other tokens are deleted from the occurence count...
-    #print("after subtract:"+str(occurences_counter))
-    occurences_counter.update({"UNK": sum([UNK_counter[token] for token in UNK_counter])}) # and added as occurences of UNK.
+    occurence_counter.subtract(UNK_counter) # all those other tokens are deleted from the occurence count...
+    #print("after subtract:"+str(occurence_counter))
+    occurence_counter.update({"UNK": sum([UNK_counter[token] for token in UNK_counter])}) # and counted as occurences of UNK.
 
-  occurences_counter.update({spec_word : len(doc) for spec_word in ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]})
+  occurence_counter.update({out_of_bounds : len(tokenized_doc) for out_of_bounds in ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]}) # We add one count of each out-of-bound special word per sentence.
 
   i2w = i2w + ["UNK"] + ["*D"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)] + ["*F"+str(i)+"*" for i in range(1,CONTEXT_SIZE+1)]
-  # The final vocab is actually VOCAB_SIZE + 1 + 2*CONTEXT_SIZE sized to account for UNK, D1, etc. # TODO est-ce que c'est bien ça qu'on veut ?
   
-  w2i = {w: i for i, w in enumerate(i2w)} # From the list of tokens in out vocabulary, we built the reverse index, token -> index number.
+  w2i = {w: i for i, w in enumerate(i2w)} # From the list of tokens in our final vocabulary, we build the reverse index, token -> index number.
 
-  return i2w, w2i, occurences_counter # A Counter will give a count of 0 for an unknown word, a dict will not.
-
-
-# notes Cécile : il faut passer à une représentation matricielle du corpus avant ou après la création des exemples ?
-
-
-doc = [["This","is","a", "test", "."], ["Test","."]]
-i2w, w2i, occurences_word = get_indices(doc)
+  #print("iw2: "+str(i2w))
+  #print("w2i: "+str(w2i))
+  return i2w, w2i, +occurence_counter # "+" removes 0 or negative count elements.
 
 
-def create_examples (tokens, w2i, occurences_word):
+def create_examples(tokenized_doc, w2i, i2w, occurence_counter):
   """Creates positive and negative examples using negative sampling.
-  An example is a (context word, target word) pair.
-  
-  -> tokens : list of lists of strings
-  -> w2i : dict of indices of words
-  -> occurences_word : dict of occurences
+  An example is a (context word, target word) pair. This is where we switch from tokens (strings) to indexes (int), using w2i.
+  It is tagged 1 for positive (extracted from the corpus) and -1 for negative (randomly created).
 
-  <- examples : list of lists of examples for each sentences # TODO note Cécile, pourquoi pas une liste d'exemples ?
-  <- gold_classes : list of lists if gold classes for each list of examples (1 or -1)
+  Note: here, i2w is only used for debugging by printing the examples.
+
+  -> tokenized_doc: list of lists of strings, a tokenized doc made of sentences made of words, as created by extract_corpus()
+  -> w2i: dict, word to index translator, w2i["word"] = index(int), as created by get_indexes_and_counter()
+  -> i2w: list, index to word translator, i2w[index(int)] = "word", as created by get_indexes_and_counter()
+  -> occurence_counter : Counter object, occurence_counter["word"] = occurence_count(int), as created by get_indexes_and_counter()
+
+  <- examples : list of tuples, list of examples, one example = (context word index, target word index)
+  <- gold_classes : list of ints, list of gold tags, one gold tag = 1|-1
   """
-  
   examples = []
   gold_classes = []
-  distribution_prob = {}
+  distribution_prob = {} # Probability of a word being picked for negative sampling.
 
-  total_number_tok = 0 # TODO à adapter avec objet Counter (counter.elements, trucs du genre)
-  for index in range(0, VOCAB_SIZE):
-    total_number_tok += occurences_word[index]**SAMPLING
-  for index in range(0, VOCAB_SIZE):
-    distribution_prob[i2w[index]] = (occurences_word[index]**SAMPLING)/total_number_tok
+  total_word_count = sum([occurence_counter[word]**SAMPLING for word in occurence_counter])
+  for word in occurence_counter:
+    distribution_prob[word] = (occurence_counter[word]**SAMPLING)/total_word_count
 
-    #TODO ajouter D, F etc au corpus pour les compter
+  # We replace unknown words by UNK.
+  for sentence in tokenized_doc:
+    for i, token in enumerate(sentence):
+      if token not in w2i:
+        sentence[i] = "UNK"
+
+  # We switch to indexes instead of string tokens.
+  indexed_doc = [[w2i[token] for token in sentence] for sentence in tokenized_doc]
   
-  
-  for sentence in tokens:
+  # Aaaand we create our examples.
+  for sentence in indexed_doc:
     length = len(sentence)
-    for i in range(length):
-      print("word: "+sentence[i])
-      for k in range(1,CONTEXT_SIZE+1):
-        if i-k >= 0:
-          print("example: ("+sentence[i-k]+","+sentence[i]+")")
-          examples.append((w2i[sentence[i-k]], w2i[sentence[i]]))
+    for i in range(length): # For each word...
+      # print("word: "+i2w[sentence[i]])
+      for k in range(1,CONTEXT_SIZE+1): # We're moving through both sides of the context window at once.
+
+        if i-k >= 0: # If we're not out of bounds to the left:
+          #print("example: ("+i2w[sentence[i-k]]+","+i2w[sentence[i]]+")")
+          examples.append((sentence[i-k], sentence[i]))
           gold_classes.append(1)
-        elif i-k < 0:
+
+        elif i-k < 0: # Otherwise, if we are:
           j = i-k+CONTEXT_SIZE+1
-          D = '*D'+str(j)+'*'
-          print("example: ("+D+","+sentence[i]+")")
-          examples.append((w2i[D], w2i[sentence[i]]))
+          D_oob_word = '*D'+str(j)+'*'
+          #print("example: ("+D_oob_word+","+i2w[sentence[i]]+")")
+          examples.append((w2i[D_oob_word], sentence[i]))
           gold_classes.append(1)
-        if i+k < length:
-          print("example: ("+sentence[i+k]+","+sentence[i]+")")
-          examples.append((w2i[sentence[i+k]], w2i[sentence[i]]))
+
+        if i+k < length: # Now the other side. If we're not out of bounds to the right:
+          #print("example: ("+i2w[sentence[i+k]]+","+i2w[sentence[i]]+")")
+          examples.append((sentence[i+k], sentence[i]))
           gold_classes.append(1)
-        elif i+k >= length:
+
+        elif i+k >= length: # But if we are:
           j = i+k-length+1
-          F = '*F'+str(j)+'*'
-          print("example: "+F+","+sentence[i]+")")
-          examples.append((w2i[F], w2i[sentence[i]]))
+          F_oob_word = '*F'+str(j)+'*'
+          #print("example: "+F_oob_word+","+i2w[sentence[i]]+")")
+          examples.append((w2i[F_oob_word], sentence[i]))
           gold_classes.append(1)
           
-      for j in range(NEGATIVE_EXAMPLE):
-        negative_rand_ex = np.random.choice(list(distribution_prob.keys()), p=list(distribution_prob.values()))
-        examples.append((w2i[negative_rand_ex], w2i[sentence[i]]))
+      for j in range(NEGATIVE_EXAMPLE): # Now, negative sampling! Using that probability distribution.
+        random_token = np.random.choice(list(distribution_prob.keys()), p=list(distribution_prob.values()))
+        #print("neg example: "+random_token+","+i2w[sentence[i]]+")") #TODO special words seem kind of overrepresented? to test
+        examples.append((w2i[random_token], sentence[i]))
         gold_classes.append(-1)
   
   return examples, gold_classes
 
-examples = create_examples(doc, w2i, occurences_word)
+tokenized_doc = [["This","is","a", "test", "."], ["Test","."]]
+i2w, w2i, occurences_word = get_indexes_and_counter(tokenized_doc)
+examples = create_examples(tokenized_doc, w2i, i2w, occurences_word)
 print("Examples: "+str(examples))
 
 
