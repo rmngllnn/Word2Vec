@@ -2,7 +2,7 @@
 (Très) inspiré du TP8 du cours d'apprentissage automatique 2 de Marie Candito
 
 # TODO: descriptions des hyperparamètres
-# TODO: gestion des hyperparamètres et des argparses en arguments ? en hyper ??
+# TODO: passer en version classe
 CONTEXT_SIZE: if = 2, then for each word, four positive examples are created: (x-2,x), (x-1,x), (x+1,x), (x+2,x).
 EMBEDDING_DIM: 
 SAMPLING: 
@@ -145,76 +145,51 @@ def get_probability_distribution(occurence_counter):
 def create_examples(indexed_doc, w2i, i2w, probability_distribution):
   #TODO voir si on peut simplifier la fonction, cf TP8 de la prof
   """Creates positive and negative examples using negative sampling.
-  An example is a (context word, target word) pair. This is where we switch from tokens (strings) to indexes (int), using w2i.
-  It is tagged 1 for positive (extracted from the corpus) and -1 for negative (randomly created).
+  An example is a (target word, context word, gold tag) trio. This is where we switch from tokens (strings) to indexes (int), using w2i. It is tagged 1 for positive (extracted from the corpus) and 0 for negative (randomly created).
 
   NOTE: here, i2w is only used for debugging by printing the examples.
 
-  -> indexed_doc: list of lists of strings, a tokenized doc made of sentences made of words, as created by extract_corpus()
+  -> indexed_doc: list of lists of ints, a tokenized doc made of sentences made of words, as created by extract_corpus(), as created by get_indexed_corpus()
   -> w2i: dict, word to index translator, w2i["word"] = index(int), as created by get_indexes()
   -> i2w: list, index to word translator, i2w[index(int)] = "word", as created by get_indexes()
   -> probability_distribution: dict, probability_distribution["word"] = probability of if getting sampled, as created by get_probability_distribution()
 
-  <- examples : list of tuples, list of examples, one example = (context word index, target word index)
-  <- gold_classes : list of ints, list of gold tags, one gold tag = 1|-1
+  <- examples : list of tuples, one example = (target word index, context word index, gold_class)
   """
   examples = []
-  gold_classes = []
   
   for sentence in indexed_doc: # For each sentence...
     for target_i in range(CONTEXT_SIZE, len(sentence) - CONTEXT_SIZE): # For each word of the actual sentence...
       for context_i in range(target_i - CONTEXT_SIZE, target_i + CONTEXT_SIZE + 1): # For each word in the context window...
         if target_i is not context_i:
-          examples.append((sentence[context_i], sentence[target_i]))
-          gold_classes.append(1)
-          #print("pos example: "+i2w[sentence[context_i]]+","+i2w[sentence[target_i]])
+          examples.append((sentence[target_i], sentence[context_i], 1))
+          #print("pos example: "+i2w[sentence[target_i]]+","+i2w[sentence[context_i]])
           
       for sample in range(NEGATIVE_EXAMPLE): # Now, negative sampling! Using that probability distribution.
         random_token = np.random.choice(list(probability_distribution.keys()), p=list(probability_distribution.values()))
-        #print("neg example: "+random_token+","+i2w[sentence[target_i]]+")") #TODO special words seem kind of overrepresented? to test
-        examples.append((w2i[random_token], sentence[target_i]))
-        gold_classes.append(-1)
+        #print("neg example: "+i2w[sentence[target_i]]+","+random_token+")") #TODO special words seem kind of overrepresented? to test
+        examples.append((sentence[target_i], w2i[random_token], 0))
   
-  return list(zip(examples, gold_classes))
-
-
-def create_batches(tagged_examples):
-  """Creates batches of examples. One batch is a ??? of a tensor of examples and a tensor of their gold tags.
-  This is where we go from lists to tensors.
-  
-  -> : 
-  -> gold_tags: 
-  <- batches: 
-  """
-  examples = [example for example, gold_tag in tagged_examples]
-  gold_tags = [gold_tag for example, gold_tag in tagged_examples]
-  X = torch.tensor(examples)
-  Y = torch.tensor(gold_tags)
-  
-  batches_X = torch.split(X, BATCH_SIZE)
-  batches_Y = torch.split(Y, BATCH_SIZE)
-  batches = list(zip(batches_X,batches_Y))
-
-  return batches
+  return examples
 
 
 class w2vModel(nn.Module):
   """
   """
-  def __init__(self, vocab_size = VOCAB_SIZE, embedding_dim = EMBEDDING_DIM):
+  def __init__(self, vocab_size = VOCAB_SIZE+2*CONTEXT_SIZE+1, embedding_dim = EMBEDDING_DIM):
         super(w2vModel, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.layer = nn.Linear(embedding_dim, vocab_size)
+        self.target_embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.context_embeddings = nn.Embedding(vocab_size, embedding_dim)
 
-  def forward(self, inputs):
-      context_embeds = self.embeddings(inputs) # (window_size*2, embedding_dim)
-      continuous_context_embed = torch.sum(context_embeds, dim=-2) #(embedding_dim)
-      scores = self.layer(continuous_context_embed) # (vocab_size)
-      output = F.log_softmax(scores,dim =0) # (vocab_size)
+  def forward(self, input):
+      target = self.target_embeddings(input[:,0])
+      context = self.context_embeddings(input[:,1])
+      output = torch.zeros(input.size()[0]) # sigmoïd du dot product pour chaque example TODO calcul du score
+      print(output)
       return output
 
 
-def train(model, tagged_examples, number_epochs = NUMBER_EPOCHS, learning_rate = LEARNING_RATE):
+def train(model, examples, number_epochs = NUMBER_EPOCHS, learning_rate = LEARNING_RATE):
   """
   """
   optimizer = optim.SGD(model.parameters(), lr=learning_rate)
@@ -223,14 +198,18 @@ def train(model, tagged_examples, number_epochs = NUMBER_EPOCHS, learning_rate =
 
   for epoch in range(number_epochs):
       epoch_loss = 0
-      random.shuffle(tagged_examples)
-
-      for X, Y in create_batches(tagged_examples):
+      random.shuffle(examples)
+      batches = torch.split(torch.tensor(examples), BATCH_SIZE)
+      for batch in batches:
           model.zero_grad() # reinitialising model gradients
-          output = model(X) # forward propagation
-          loss = loss_function(output, Y) # computing loss
+          output = model(batch) # forward propagation
+          print(batch[:,2])
+          loss = loss_function(output, batch[:,2]) # computing loss TODO comment on calcule la loss
+          # on a vecteur proba de (t,c) et un vecteur de (g), g=0|1
           loss.backward() # back propagation, computing gradients
+          # TODO est-ce que backward marche là aussi ou est-ce qu'on doit le faire à la main ?
           optimizer.step() # one step in gradient descent
+          # TODO même question
           epoch_loss += loss.item()
 
       loss_over_time.append(epoch_loss)
