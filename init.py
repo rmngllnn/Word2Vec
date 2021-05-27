@@ -18,6 +18,7 @@ EMBEDDING_DIM = 10
 SAMPLING = 0.75
 NEGATIVE_EXAMPLE = 3 # If NEGATIVE_EXAMPLE = 2, then for each word, two negative examples are randomly created.
 VOCAB_SIZE = 2
+EMBEDDING_DIM = 10
 
 
 def extract_corpus(infile):
@@ -161,7 +162,17 @@ def create_batches(X, Y):
 class w2vModel(nn.Module):
   """
   """
-  pass
+  def __init__(self, vocab_size = VOCAB_SIZE, embedding_dim = EMBEDDING_DIM):
+        super(w2vModel, self).__init__()
+        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.layer = nn.Linear(EMBEDDING_DIM, vocab_size)
+
+    def forward(self, inputs):
+        context_embeds = self.embeddings(inputs) # (window_size*2, embedding_dim)
+        continuous_context_embed = torch.sum(context_embeds, dim=-2) #(embedding_dim)
+        scores = self.layer(continuous_context_embed) # (vocab_size)
+        output = F.log_softmax(scores,dim =0) # (vocab_size)
+        return outputass
 
 
 
