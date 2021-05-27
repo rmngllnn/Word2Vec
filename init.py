@@ -19,6 +19,9 @@ SAMPLING = 0.75
 NEGATIVE_EXAMPLE = 3 # If NEGATIVE_EXAMPLE = 2, then for each word, two negative examples are randomly created.
 VOCAB_SIZE = 2
 EMBEDDING_DIM = 10
+NUMBER_EPOCHS = 5
+LEARNING_RATE = 0.05
+BATCH_SIZE = 5
 
 
 def extract_corpus(infile):
@@ -82,6 +85,7 @@ def get_indexes_and_counter(tokenized_doc):
 
 
 def create_examples(tokenized_doc, w2i, i2w, occurence_counter):
+  #TODO voir si on peut simplifier la fonction, cf TP8 de la prof
   """Creates positive and negative examples using negative sampling.
   An example is a (context word, target word) pair. This is where we switch from tokens (strings) to indexes (int), using w2i.
   It is tagged 1 for positive (extracted from the corpus) and -1 for negative (randomly created).
@@ -153,7 +157,7 @@ def create_examples(tokenized_doc, w2i, i2w, occurence_counter):
   return examples, gold_classes
 
 
-def create_batches(X, Y):
+def create_batches(examples, gold_tags):
   """
   """
   pass
@@ -165,14 +169,34 @@ class w2vModel(nn.Module):
   def __init__(self, vocab_size = VOCAB_SIZE, embedding_dim = EMBEDDING_DIM):
         super(w2vModel, self).__init__()
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.layer = nn.Linear(EMBEDDING_DIM, vocab_size)
+        self.layer = nn.Linear(embedding_dim, vocab_size)
 
-    def forward(self, inputs):
-        context_embeds = self.embeddings(inputs) # (window_size*2, embedding_dim)
-        continuous_context_embed = torch.sum(context_embeds, dim=-2) #(embedding_dim)
-        scores = self.layer(continuous_context_embed) # (vocab_size)
-        output = F.log_softmax(scores,dim =0) # (vocab_size)
-        return outputass
+  def forward(self, inputs):
+      context_embeds = self.embeddings(inputs) # (window_size*2, embedding_dim)
+      continuous_context_embed = torch.sum(context_embeds, dim=-2) #(embedding_dim)
+      scores = self.layer(continuous_context_embed) # (vocab_size)
+      output = F.log_softmax(scores,dim =0) # (vocab_size)
+      return output
+
+def train(model, examples, gold_tags, number_epochs = NUMBER_EPOCHS, learning_rate = LEARNING_RATE):
+  optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+  loss_over_time = []
+  loss_function = nn.NLLLoss()
+
+  for epoch in range(number_epochs):
+      batches = create_batches(examples, gold_tags)
+      epoch_loss = 0
+
+      for X, Y in batches:
+          model.zero_grad() # reinitialising model gradients
+          output = model(X) # forward propagation
+          loss = loss_function(output, Y) # computing loss
+          loss.backward() # back propagation, computing gradients
+          optimizer.step() # one step in gradient descent
+          epoch_loss += loss.item()
+
+      loss_over_time.append(epoch_loss)
+  return loss_over_time
 
 
 
