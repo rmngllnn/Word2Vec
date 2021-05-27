@@ -151,6 +151,20 @@ def create_examples(tokenized_doc, w2i, i2w, occurence_counter):
   
   return examples, gold_classes
 
+
+def create_batches(X, Y):
+  """
+  """
+  pass
+
+
+class w2vModel(nn.Module):
+  """
+  """
+  pass
+
+
+
 tokenized_doc = [["This","is","a", "test", "."], ["Test","."]]
 i2w, w2i, occurences_word = get_indexes_and_counter(tokenized_doc)
 examples = create_examples(tokenized_doc, w2i, i2w, occurences_word)
