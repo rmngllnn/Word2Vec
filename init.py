@@ -159,8 +159,17 @@ def create_examples(tokenized_doc, w2i, i2w, occurence_counter):
 
 def create_batches(examples, gold_tags):
   """
+  examples is two lists. examples[0] = context, examples[1] = target
+  -> list of examples, made of two lists ([context],[target]
+  <- two lists [batch_context], [batch_target]
   """
-  pass
+  X = torch.tensor(examples[0])
+  Y = torch.tensor(examples[1])
+  
+  batch_X = torch.split(X, BATCH_SIZE)
+  batch_Y = torch.split(Y, BATCH_SIZE)
+  
+  return batch_X, batch_Y
 
 
 class w2vModel(nn.Module):
