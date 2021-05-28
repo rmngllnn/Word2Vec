@@ -12,12 +12,34 @@ EMBEDDING_DIM = 10
 BATCH_SIZE = 40
 NB_EPOCH = 10
 
+class CBOW(nn.Module):
 
-#Loss Function
-loss = nn.NLLLoss()
+    def __init__(self, vocab_size, embedding_dim):
+        super(CBOW, self).__init__()
+        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.linear = nn.Linear(embedding_dim, vocab_size)
 
-#optimization method
-optimizer = optim.SGD(model.parameters(), lr=0.05)
+    def forward(self, inputs):
+        #@@ inputs est un tenseur
+        #@@ dim 0 = taille du minibatch
+        #@@ dim 1 = les différentes positions de contexte
+        #@@ en appliquant self.embeddings, on ajoute une
+        #@@ dim 2 = les différentes composantes de l'embedding d'un mot de contexte
+        embeds = self.embeddings(inputs)
+        batch_size = embeds.size()[0]
+        #@@ on souhaite sommer les différents embeddings des mots de contexte
+        sum_embeds = torch.sum(embeds, dim=1)
+
+        out = self.linear(sum_embeds)
+        log_probs = F.log_softmax(out, dim=1)
+        return log_probs
+
+
+losses = []
+loss_function = nn.NLLLoss()
+model = CBOW(len(vocab), EMBEDDING_DIM)
+optimizer = optim.SGD(model.parameters(), lr=0.001)
+
 
 #Loop over dataset
 for epoch in range(NB_EPOCHS):
