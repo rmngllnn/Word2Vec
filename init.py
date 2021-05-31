@@ -151,8 +151,8 @@ class Word2Vec(nn.Module):
 
     self.target_embeddings = nn.Embedding(self.vocab_size, self.embedding_dim)
     self.context_embeddings = nn.Embedding(self.vocab_size, self.embedding_dim)
+    self.__init_embed()
     if verbose: print("\nEmbeddings initialized.")
-    # TODO Romy : initialiser les embeddings selon les bonnes distributions, peut-être dans une fonction auxiliaire ?
 
     self.occurence_counter = self.__get_occurence_counter()
     self.i2w = [token for token in self.occurence_counter]
@@ -163,6 +163,14 @@ class Word2Vec(nn.Module):
     self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate)
     if self.verbose: print("\nReady to train!")
 
+  def __init_embed(self) :
+    """Initializes the embeddinsg randomly (just like introduced in TP8)
+    The target embeddings weights are between -0.5/self.embedding_dim and 0.5/self.embedding_dim while the context embeddings weights are zeroes."""
+
+    initrange = 0.5/self.embedding_dim
+    self.target_embeddings.weight.data.uniform_(-initrange,initrange)
+    self.context_embeddings.weight.data.uniform_(-0,0)
+    return
 
   def __get_occurence_counter(self):
     """Generates the occurence count with only the vocab_size most common words and the special words.
