@@ -1,3 +1,5 @@
+import json
+
 def extract_corpus(infile):
   """Extracts a file, gets rid of the POS tags, tokenizes it.
   Sentences are split into words based on " ". Nothing is done to uppercase letters or punctuation.
@@ -19,7 +21,7 @@ def extract_corpus(infile):
 
 """For details about json files see https://www.codeflow.site/fr/article/python-json"""
 
-def seralisation_data(data, title):
+def serialisation_data(data, title):
     """Serialize data in a json file (in desktop)
     -> data is the variable you want to serialize
     -> title must be a string : "title.json"
@@ -31,8 +33,8 @@ def seralisation_data(data, title):
 
 
 def open_file(json_file):
-    """ open_file open a json file and put content in variable data
-    -> json file, json_file must a string "jsonfile.json"
+    """ open_file opens a json file and puts content in variable data
+    -> a json file. Must a string "jsonfile.json"
     <- list of words
     """
     
@@ -40,3 +42,7 @@ def open_file(json_file):
         data = json.load(json_data)
         
     return data
+
+data = extract_corpus("mini_corpus.txt")
+serialisation_data(data, "test.json")
+print("DONE !")
