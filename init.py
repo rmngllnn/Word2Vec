@@ -5,7 +5,7 @@ Cette implémentation est très inspirée de :
 - l'implémentation word2vec CBOW du TP8 du cours d'apprentissage automatique 2 de Marie Candito
 - l'implémentation word2vec SkipGram de Xiaofei Sun (https://adoni.github.io/2017/11/08/word2vec-pytorch/)
 
-TODO initialisation des embeddings, et voir si les scores passent bien à des valeurs entre 0 et 1
+TODO extraction du gros corpus et sérialisation de tokenized doc dans un autre programme, déserialisation dans celui-ci
 TODO évaluation
 TODO argparse
 TODO script pour tester les différents hyperparamètres
@@ -25,7 +25,7 @@ torch.manual_seed(1)
 
 
 def extract_corpus(infile):
-  """Extracts the corpus, gets rid of the POS tags, tokenizes it.
+  """Extracts a file, gets rid of the POS tags, tokenizes it.
   Sentences are split into words based on " ". Nothing is done to uppercase letters or punctuation.
   Calibrated for the "L'Est républicain" corpus, cf README for the original download links.
 
@@ -66,9 +66,11 @@ class Word2Vec(nn.Module):
                       (r1, x, -), (r2, x, -)
   embedding_dim       int, the size of the word embeddings
   sampling            float, the sampling rate to calculate the negative example distribution probability
+
   number_epochs       int, the number of epochs to train for
   batch_size          int, the number of examples in a batch
   learning_rate       float, the learning rate step when training
+
   verbose             bool, verbose mode
   debug               bool, debug mode
 
@@ -76,16 +78,17 @@ class Word2Vec(nn.Module):
                         as created by extract_corpus() for example
                         special words are not yet present
   indexed_doc           list of lists of ints, the same doc, indexes instead of tokens, special words in
+  occurence_counter     Counter object, occurence_counter["word"] = occurence_count(int)
+  prob_dist             dict, prob_dist["word"] = probability of the word getting sampled
+
+  i2w                   list, index to word translator, i2w[index(int)] = "word"
+  w2i                   dict, word to index translator, w2i["word"] = index(int)
+  examples              list of tuples, examples[(int)] = (context_word_id, target_word_id, pos|neg)
 
   target_embeddings     Embeddings, the weights of the "hidden" layer for each target word,
                         and the final learned embeddings
   context_embeddings    Embeddings, the representation of each context word, the input for forward/predict
 
-  occurence_counter     Counter object, occurence_counter["word"] = occurence_count(int)
-  i2w                   list, index to word translator, i2w[index(int)] = "word"
-  w2i                   dict, word to index translator, w2i["word"] = index(int)
-  prob_dist             dict, prob_dist["word"] = probability of the word getting sampled
-  examples              list of tuples, examples[(int)] = (context_word_id, target_word_id, pos|neg)
   optimizer             SGD, for the gradient descent in train
   """
   def __init__(self, tokenized_doc,
@@ -93,7 +96,7 @@ class Word2Vec(nn.Module):
       embedding_dim = 10,
       sampling = 0.75,
       negative_examples = 3,
-      vocab_size = 10,
+      vocab_size = 20,
       number_epochs = 5,
       learning_rate = 0.05,
       batch_size = 5,
@@ -125,7 +128,7 @@ class Word2Vec(nn.Module):
     assert type(sampling) is float and sampling > 0 and sampling < 1, "Problem with sampling."
     self.sampling = sampling
 
-    assert type(np.negative) is int and negative_examples > 0, "Problem with negative_examples."
+    assert type(negative_examples) is int and negative_examples > 0, "Problem with negative_examples."
     self.negative_examples = negative_examples
 
     assert type(number_epochs) is int and number_epochs > 0, "Problem with number_epochs."
@@ -141,7 +144,7 @@ class Word2Vec(nn.Module):
       print("\nWord2Vec SKipGram model with negative sampling.")
       print("\nParameters:")
       print("context size = " + str(self.context_size))
-      print("vocabulary size = " + str(self.vocab_size))
+      print("max vocabulary size = " + str(self.vocab_size))
       print("embedding dimensions = " + str(self.embedding_dim))
       print("sampling rate = " + str(self.sampling))
       print("negative examples per positive example = " + str(self.negative_examples))
@@ -149,28 +152,25 @@ class Word2Vec(nn.Module):
       print("learning rate = " + str(self.learning_rate))
       print("batch size = " + str(self.batch_size))
 
-    self.target_embeddings = nn.Embedding(self.vocab_size, self.embedding_dim)
-    self.context_embeddings = nn.Embedding(self.vocab_size, self.embedding_dim)
-    self.__init_embed()
-    if verbose: print("\nEmbeddings initialized.")
-
     self.occurence_counter = self.__get_occurence_counter()
     self.i2w = [token for token in self.occurence_counter]
     self.w2i = {w: i for i, w in enumerate(self.i2w)}
     self.indexed_doc = self.__get_indexed_doc()
     self.prob_dist =  self.__get_prob_dist()
     self.examples = self.__create_examples()
+
+    self.target_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True)
+    self.context_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True)
+    # Changed the first dimension from vocab_size to len of vocabulary, because the first is actually
+    # the max vocab size and not the actual vocab size
+    range = 0.5/self.embedding_dim
+    self.target_embeddings.weight.data.uniform_(-range,range)
+    self.context_embeddings.weight.data.uniform_(-0,0)
+    if verbose: print("\nEmbeddings initialized.")
+
     self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate)
     if self.verbose: print("\nReady to train!")
 
-  def __init_embed(self) :
-    """Initializes the embeddinsg randomly (just like introduced in TP8)
-    The target embeddings weights are between -0.5/self.embedding_dim and 0.5/self.embedding_dim while the context embeddings weights are zeroes."""
-
-    initrange = 0.5/self.embedding_dim
-    self.target_embeddings.weight.data.uniform_(-initrange,initrange)
-    self.context_embeddings.weight.data.uniform_(-0,0)
-    return
 
   def __get_occurence_counter(self):
     """Generates the occurence count with only the vocab_size most common words and the special words.
@@ -288,15 +288,18 @@ class Word2Vec(nn.Module):
     """
     target_embeds = self.target_embeddings(target_words)
     context_embeds = self.context_embeddings(context_words)
-    scores = torch.mul(target_embeds, context_embeds)
-    scores = torch.sum(scores, dim=1)
-    scores = F.logsigmoid(scores)
-
     if self.debug:
-      print("\nForward propagation.")
-      print("Targets: "+str(target_words))
-      print("Contexts: "+str(context_words))
-      print("Scores: "+str(scores))
+      print("\nForward propagation on batch.")
+      print("Target ids: "+str(target_words))
+      print("Context ids: "+str(context_words))
+      print("Target embeddings: "+str(target_embeds))
+      print("Context embeddings: "+str(context_embeds))
+    scores = torch.mul(target_embeds, context_embeds)
+    if self.debug: print("mul: "+str(scores))
+    scores = torch.sum(scores, dim=1)
+    if self.debug: print("sum: "+str(scores))
+    scores = F.logsigmoid(scores)
+    if self.debug: print("sig: "+str(scores))
 
     return scores
 
@@ -322,23 +325,25 @@ class Word2Vec(nn.Module):
         gold_tags = batch[:,2]
 
         scores = self(target_words, context_words) # Forward propagation.
-        batch_loss = -1 * torch.sum(torch.abs(scores - gold_tags))
+        batch_loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
+        # probability we want to associate with the example (gold_tag) and the probability measured by
+        # the model (score))
         epoch_loss += batch_loss
 
         self.zero_grad() # Reinitialising model gradients.
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
 
-      if self.debug: print("Epoch "+str(epoch+1)+", loss = "+str(epoch_loss.item()))
+      if self.verbose: print("Epoch "+str(epoch+1)+", loss = "+str(epoch_loss.item()))
       loss_over_epochs.append(epoch_loss.item())
     if self.verbose: print("Training done!")
     return loss_over_epochs
 
 
 
-tokenized_doc = [["This","is","a", "test."], ["Test."]]
-
-model = Word2Vec(tokenized_doc, verbose = True, debug = True)
+test_doc = [["This","is","a", "test."], ["Test."]]
+tokenized_doc = extract_corpus("mini_corpus.txt")
+model = Word2Vec(tokenized_doc, batch_size=20, number_epochs=100, verbose = True, debug = False)
 loss_over_time = model.train()
 
 
