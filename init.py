@@ -6,7 +6,7 @@ Cette implémentation est très inspirée de :
 - l'implémentation word2vec SkipGram de Xiaofei Sun (https://adoni.github.io/2017/11/08/word2vec-pytorch/)
 
 TODO extraction du gros corpus et sérialisation de tokenized doc dans un autre programme, déserialisation dans celui-ci
-TODO évaluation
+TODO évaluation : https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
 TODO argparse
 TODO script pour tester les différents hyperparamètres
 TODO sauvegarde des embeddings
@@ -20,6 +20,7 @@ import argparse
 import numpy as np
 from collections import Counter
 import random
+from scipy import stats
 
 torch.manual_seed(1)
 
@@ -338,6 +339,30 @@ class Word2Vec(nn.Module):
       loss_over_epochs.append(epoch_loss.item())
     if self.verbose: print("Training done!")
     return loss_over_epochs
+
+
+
+def spearman_evaluation(vector1, vector2):
+  """Calculate a Spearman correlation coefficient with p-value
+   -> vector1, vector2 : Two 1-D or 2-D arrays containing multiple variables and observations.
+   Both arrays need to have the same length in the axis dimension.
+
+  axis int or None, optional. If axis=0 (default), then each column represents a variable, with observations in the rows.
+  If axis=1, the relationship is transposed: each row represents a variable, while the columns contain observations.
+  If axis=None, then both arrays will be raveled.
+
+  <- correlation : float or ndarray (2-D square)
+  Spearman correlation matrix or correlation coefficient (if only 2 variables are given as parameters.
+  Correlation matrix is square with length equal to total number of variables (columns or rows) in vctor1 and vector2 combined.
+
+  <- pvalue : float
+  The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
+  """
+
+  coeff = stats.spearmanr(x2n, y2n, axis=None)
+
+  return coeff
+  
 
 
 
