@@ -95,11 +95,11 @@ class Word2Vec(nn.Module):
       context_size = 2,
       embedding_dim = 10,
       sampling = 0.75,
-      negative_examples = 3,
+      negative_examples = 5,
       vocab_size = 20,
       number_epochs = 5,
       learning_rate = 0.05,
-      batch_size = 5,
+      batch_size = 150,
       verbose = True,
       debug = False):
     """ Initializes the model.
@@ -343,7 +343,7 @@ class Word2Vec(nn.Module):
 
 test_doc = [["This","is","a", "test."], ["Test."]]
 tokenized_doc = extract_corpus("mini_corpus.txt")
-model = Word2Vec(tokenized_doc, batch_size=20, number_epochs=100, verbose = True, debug = False)
+model = Word2Vec(tokenized_doc, batch_size=10, number_epochs=200, verbose = True, debug = False)
 loss_over_time = model.train()
 
 
