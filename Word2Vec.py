@@ -3,14 +3,18 @@ For command line instructions, see README.
 
 TODO questions à Candito :
 - loss relative au nombre d'exemples ?
-- arrêt de l'apprentissage ?
+- arrêt de l'apprentissage : surapprentissage ou plus d'apprentissage ?
 - bonnes pratiques en terme de séparation du code en classes et/ou programmes et/ou modules
+- on met quoi dans le compte-rendu ?
 
-TODO argparse
-TODO sauvegarde des embeddings
-TODO script pour tester les différents hyperparamètres
-TODO évaluation : https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
-TODO finir class Evaluation (à mettre dans un autre fichier également)
+TODO organisation :
+- rajouter spearman eval à w2v
+- créer classe pour le corpus/exemples/etc
+- sortir serialize/deserialize, fichier fonctions auxiliaires...?
+TODO script bash pour tester les différents hyperparamètres
+TODO README instructions
+TODO rapport (17)
+TODO soutenance (23~24)
 """
 
 import torch
@@ -21,8 +25,8 @@ import argparse
 import numpy as np
 from collections import Counter
 import random
-from scipy import stats
 from extract_corpus import deserialize
+from extract_corpus import serialize
 
 torch.manual_seed(1)
 
@@ -272,7 +276,8 @@ class Word2Vec(nn.Module):
     return scores
 
 
-  def train(self, number_epochs,
+  def train(self,
+      number_epochs,
       learning_rate,
       batch_size):
     """ Executes gradient descent to learn the embeddings.
@@ -295,6 +300,7 @@ class Word2Vec(nn.Module):
       print("\nTraining...")
 
     loss_over_epochs = []
+    spearman_over_epochs = []
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
     for epoch in range(number_epochs):
@@ -319,8 +325,9 @@ class Word2Vec(nn.Module):
 
       if self.verbose: print("Epoch "+str(epoch+1)+", loss = "+str(epoch_loss.item()))
       loss_over_epochs.append(epoch_loss.item())
+      # TODO spearman_over_epochs.append(self.spearman.evaluate())
     if self.verbose: print("Training done!")
-    return loss_over_epochs
+    return loss_over_epochs, spearman_over_epochs
 
 
   def save_embeddings(self, save_path):
@@ -328,65 +335,15 @@ class Word2Vec(nn.Module):
 
     -> save_path: string, path of the file to save as
     """
+    serialize(self.target_embeddings, save_path)
+
+  def eval(self):
     pass
 
 
 
-class Evaluation() :
-  """Proceed to the evaluation of our Word2Vec model.
-  
-  target_embedding : Tensor, target words embeddings learnt with class Word2Vec
-  similarity_file : string, the file name which contains the scores of human judgment similarity
-  n_pairs : int, the number of pairs of words we want to compare.
-  i2w : dict, index to word translator.
-  """
 
-  def init(self, target_embedding, similarity_file, n_pairs, i2w) :
-    self.target_embedding = target_embedding
-    self.similarity_file = similarity_file
-    self.n_pairs = n_pairs
-    #TODO : we have to save the i2w from the class Word2Vec 
-    self.i2w = i2w
-
-  def get_scores_similarity(self) :
-    """Opens the file containing the scores (similarity.txt) and stores pairs of French words and its score in a dict"""
-    pairs_score = {}
-    f = open(self.similarity_file, 'r', encoding="utf-8")
-    #TODO
-    f.close()
-    return pairs_score
-
-  def get_vectors(self, human_judgment) :
-    """
-    Return two vectors (ndarrays) of the same (n_pairs) size : one containing scores of human judgment similarity and the other containing scores of similarity based on our model.
-    It takes n_pairs random pairs of word from human_judgment, their respective scores and the respective scores for our vector words.
-
-    -> human_judgment : dict, human_judgment[(w,c)] = score (get_score_similarity)
-    <- vector1, vector2 : two 1-D arrays containing n_pairs scores.
-
-    """
-    pass #TODO
-  
-  def spearman_evaluation(self, vector1, vector2):
-    """Calculate a Spearman correlation coefficient with p-value
-    -> vector1, vector2 : Two 1-D or 2-D arrays containing multiple variables and observations.
-    Both arrays need to have the same length in the axis dimension.
-
-    axis int or None, optional. If axis=0 (default), then each column represents a variable, with observations in the rows.
-    If axis=1, the relationship is transposed: each row represents a variable, while the columns contain observations.
-    If axis=None, then both arrays will be raveled.
-
-    <- correlation : float or ndarray (2-D square)
-    Spearman correlation matrix or correlation coefficient (if only 2 variables are given as parameters.
-    Correlation matrix is square with length equal to total number of variables (columns or rows) in vctor1 and vector2 combined.
-
-    <- pvalue : float
-    The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
-    """
-
-    coeff = stats.spearmanr(x2n, y2n, axis=None)
-
-    return coeff
+    
 
 
 if __name__ == "__main__":
@@ -400,14 +357,23 @@ if __name__ == "__main__":
   parser.add_argument('--number_epochs', type=int, default=5, help='The number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=150,  help='The number of examples in a batch')
   parser.add_argument('--learning_rate', type=int, default=0.05, help='The learning rate step when training')
-  parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode?')
-  parser.add_argument('--debug', type=bool, default=False, help='Debug mode ?')
+  parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
+  parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
   args = parser.parse_args()
 
 
-  model = Word2Vec(args.corpus_path, args.context_size, args.embedding_dim, args.sampling, args.negative_examples, args.vocab_size, args.verbose, args.debug)
-  loss_over_time = model.train(batch_size=args.batch_size, number_epochs=args.number_epochs, learning_rate=args.learning_rate)
-  W = model.target_embeddings.weight.data #Tensor type
-  C = model.context_embeddings.weight.data #Tensor type
+  model = Word2Vec(corpus_path = args.corpus_path,
+    context_size = args.context_size,
+    embedding_dim = args.embedding_dim,
+    sampling = args.sampling,
+    negative_examples = args.negative_examples,
+    vocab_size = args.vocab_size,
+    verbose = args.verbose,
+    debug = args.debug)
+
+  loss_over_epochs, spearman_over_epochs = model.train(batch_size=args.batch_size,
+    number_epochs=args.number_epochs,
+    learning_rate=args.learning_rate)
+
 
 

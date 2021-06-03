@@ -1,5 +1,4 @@
-Dans ce projet, on se propose d'implémenter le modèle word2vec en version SkipGram avec sampling
-négatif. Un programme d'extraction de corpus est incluse.
+Dans ce projet, on se propose d'implémenter le modèle word2vec en version SkipGram avec sampling négatif. Un programme d'extraction de corpus est incluse.
 
 Cette implémentation est très inspirée de :
 - l'implémentation word2vec CBOW du TP8 du cours d'apprentissage automatique 2 de Marie Candito

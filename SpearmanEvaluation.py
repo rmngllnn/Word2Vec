@@ -1,20 +1,26 @@
 """ SpearmanEvaluation.py
 Not meant to be used on its own.
+https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
+TODO verbose/debug
 """
 
 import torch
 from scipy import stats
+import torch.nn as nn
+import torch.nn.functional as F
 
-class Spearman_Evaluation: # TODO euh on met ça dans une classe, dans un programme, dans une méthode de W2V, ...?
+class SpearmanEvaluation: # TODO euh on met ça dans une classe, dans un programme, dans une méthode de W2V, ...?
   """ Evaluates embeddings thanks to a human-scored corpus of word pair similarities.
   
-  learned_embeddings  Tensor, word embeddings learnt with Word2Vec, to test
-  w2i                 dict, word to index translator, learned with the word embeddings
+  learned_embeddings  Embeddings, word embeddings to evaluate
+  w2i                 dict, word to index translator, corresponding to said word embeddings
   pairs               Tensor, pair ids
   gold_scores         Tensor, human_scores
+  verbose             boolean, verbose mode
+  debug               boolean, debug mode
   """
 
-  def init(self, similarity_file_path, w2i, learned_embeddings):
+  def __init__(self, similarity_file_path, w2i, learned_embeddings, verbose, debug):
     """ Initializes based on a corpus of human-scored similarity pairs.
 
     -> similarity_file_path: string, path to the file with human judgment similarity scores
@@ -22,8 +28,10 @@ class Spearman_Evaluation: # TODO euh on met ça dans une classe, dans un progra
     -> learned_embeddings: Embeddings, reference to the same embeddings as the model being evaluated
     """
     self.w2i = w2i
-    self.learned_embeddings = learned_embeddings
+    self.verbose = verbose
+    self.debug = debug
     self.pairs, self.gold_scores = self.__extract_corpus(similarity_file_path)
+    self.learned_embeddings = learned_embeddings
 
 
   def __extract_corpus(self, path):
@@ -34,7 +42,8 @@ class Spearman_Evaluation: # TODO euh on met ça dans une classe, dans un progra
 
     with open(path, 'r', encoding="utf-8") as f:
       for line in f.readlines():
-        word1, word2, score = line.split()
+        #if self.verbose: print(line)
+        word1, word2, score = line.split(" ")
         if word1 in self.w2i: # TODO c'est pas très beau comme code ça ^^"
           word1 = self.w2i[word1]
         else:
@@ -42,11 +51,11 @@ class Spearman_Evaluation: # TODO euh on met ça dans une classe, dans un progra
         if word2 in self.w2i:
           word2 = self.w2i[word2]
         else:
-          word1 = self.w2i['UNK']
+          word2 = self.w2i['UNK']
 
         pairs.append([word1, word2])
-        scores.append(score)
-
+        scores.append(float(score))
+        
     return torch.tensor(pairs), torch.tensor(scores)
 
   def evaluate(self):
@@ -78,3 +87,8 @@ class Spearman_Evaluation: # TODO euh on met ça dans une classe, dans un progra
 
 if __name__ == "__main__":
     print("This file isn't meant to be launched on it's own...")
+    print("But okay let's test it.")
+    w2i = {}
+    w2i['UNK'] = 0
+    embeddings = nn.Embedding(1, 10, sparse=True)
+    test = SpearmanEvaluation("similarity.txt", w2i, embeddings, True, True)

@@ -3,7 +3,7 @@ For command line instructions, see README.
 For details about json files, see https://www.codeflow.site/fr/article/python-json
 
 TODO test avec des subfolders ?
-TODO argparse
+TODO debug
 """
 
 import json
@@ -57,7 +57,7 @@ def deserialize(infile):
     return data
 
 
-def extract_corpus(corpus_path, save_as, number_sentences=0) :
+def extract_corpus(corpus_path, save_path, number_sentences=0) :
   """ Extracts and serializes a set number of sentences, sampled over the whole
   corpus. If that number < 1, will keep the whole corpus.
   The corpus folder should only contain text files, subfolders will be ignored.
@@ -68,28 +68,27 @@ def extract_corpus(corpus_path, save_as, number_sentences=0) :
 
   -> corpus_path: string, path to the corpus folder
   -> number_sentences: int, total number of sentences to be extracted
-  -> save_as: string, path to the file to be created
+  -> save_path: string, path to the file to be created
   """
   file_list = os.listdir(corpus_path)
   corpus_doc = []
 
   for file in file_list:
-    print(file)
-    if file[0] != '.': # TODO check: is it for hidden files?
+    #if self.verbose: print(file)
+    if file[0] != '.': # To avoid hidden files...
       corpus_doc += extract_file(corpus_path+'/'+file)
 
   if number_sentences < 1:
-    serialize(random.shuffle(corpus_doc)[:number_sentences], save_as)
+    serialize(random.shuffle(corpus_doc)[:number_sentences], save_path)
   else:
-    serialize(corpus_doc, save_as)
+    serialize(corpus_doc, save_path)
 
   
 if __name__ == "__main__":
-  extract_corpus("./EP.tcs.melt.utf8.c", 100, "./test.json")
-
-#TODO argparse
   parser = argparse.ArgumentParser()
-  parser.add_argument('corpus_path', default=None, type=str, help='Path to files used to create examples.') 
-  parser.add_argument('--number_sentences', default=0, help='Number of sentences to be extracted')
-  parser.add_argument('--save_path', default="./", type=str, help='Path where to save files')
+  parser.add_argument('corpus_path', default=None, type=str, help='Path to folder with the raw text files.') 
+  parser.add_argument('--number_sentences', default=0, type=int, help='Number of sentences to be extracted')
+  parser.add_argument('--save_path', default="./corpus.json", type=str, help='Path to the file to be created')
   args = parser.parse_args()
+
+  extract_corpus(corpus_path = args.corpus_path, save_path = args.save_path, number_sentences = args.number_sentences)
