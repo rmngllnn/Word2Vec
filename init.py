@@ -10,6 +10,7 @@ TODO évaluation : https://docs.scipy.org/doc/scipy/reference/generated/scipy.st
 TODO argparse
 TODO script pour tester les différents hyperparamètres
 TODO sauvegarde des embeddings
+TODO finir class Evaluation (à mettre dans un autre fichier également)
 """
 
 import torch
@@ -341,27 +342,61 @@ class Word2Vec(nn.Module):
     return loss_over_epochs
 
 
-
-def spearman_evaluation(vector1, vector2):
-  """Calculate a Spearman correlation coefficient with p-value
-   -> vector1, vector2 : Two 1-D or 2-D arrays containing multiple variables and observations.
-   Both arrays need to have the same length in the axis dimension.
-
-  axis int or None, optional. If axis=0 (default), then each column represents a variable, with observations in the rows.
-  If axis=1, the relationship is transposed: each row represents a variable, while the columns contain observations.
-  If axis=None, then both arrays will be raveled.
-
-  <- correlation : float or ndarray (2-D square)
-  Spearman correlation matrix or correlation coefficient (if only 2 variables are given as parameters.
-  Correlation matrix is square with length equal to total number of variables (columns or rows) in vctor1 and vector2 combined.
-
-  <- pvalue : float
-  The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
+class Evaluation() :
+  """Proceed to the evaluation of our Word2Vec model.
+  
+  target_embedding : Tensor, target words embeddings learnt with class Word2Vec
+  similarity_file : string, the file name which contains the scores of human judgment similarity
+  n_pairs : int, the number of pairs of words we want to compare.
+  i2w : dict, index to word translator.
   """
 
-  coeff = stats.spearmanr(x2n, y2n, axis=None)
+  def init(self, target_embedding, similarity_file, n_pairs, i2w) :
+    self.target_embedding = target_embedding
+    self.similarity_file = similarity_file
+    self.n_pairs = n_pairs
+    #TODO : we have to save the i2w from the class Word2Vec 
+    self.i2w = i2w
 
-  return coeff
+  def get_scores_similarity(self) :
+    """Opens the file containing the scores (similarity.txt) and stores pairs of French words and its score in a dict"""
+    pairs_score = {}
+    f = open(self.similarity_file, 'r', encoding="utf-8")
+    #TODO
+    f.close()
+    return pairs_score
+
+  def get_vectors(self, human_judgment) :
+    """
+    Return two vectors (ndarrays) of the same (n_pairs) size : one containing scores of human judgment similarity and the other containing scores of similarity based on our model.
+    It takes n_pairs random pairs of word from human_judgment, their respective scores and the respective scores for our vector words.
+
+    -> human_judgment : dict, human_judgment[(w,c)] = score (get_score_similarity)
+    <- vector1, vector2 : two 1-D arrays containing n_pairs scores.
+
+    """
+    pass #TODO
+  
+  def spearman_evaluation(self, vector1, vector2):
+    """Calculate a Spearman correlation coefficient with p-value
+    -> vector1, vector2 : Two 1-D or 2-D arrays containing multiple variables and observations.
+    Both arrays need to have the same length in the axis dimension.
+
+    axis int or None, optional. If axis=0 (default), then each column represents a variable, with observations in the rows.
+    If axis=1, the relationship is transposed: each row represents a variable, while the columns contain observations.
+    If axis=None, then both arrays will be raveled.
+
+    <- correlation : float or ndarray (2-D square)
+    Spearman correlation matrix or correlation coefficient (if only 2 variables are given as parameters.
+    Correlation matrix is square with length equal to total number of variables (columns or rows) in vctor1 and vector2 combined.
+
+    <- pvalue : float
+    The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
+    """
+
+    coeff = stats.spearmanr(x2n, y2n, axis=None)
+
+    return coeff
   
 
 
@@ -370,12 +405,23 @@ test_doc = [["This","is","a", "test."], ["Test."]]
 tokenized_doc = extract_corpus("mini_corpus.txt")
 model = Word2Vec(tokenized_doc, batch_size=10, number_epochs=200, verbose = True, debug = False)
 loss_over_time = model.train()
+W = model.target_embeddings.weight.data #Tensor type
+C = model.context_embeddings.weight.data #Tensor type
 
 
 #PARTIE MAIN
 parser = argparse.ArgumentParser()
-#Dans le terminal, on écrira "python3 init.py NOM_DU_FICHIER_CORPUS"
-parser.add_argument('examples_file', default=None, help='Corpus utilisé pour la création d\'exemples d\'apprentissage pour les embeddings.')
+parser.add_argument('examples_file', default=None, help='Corpus utilisé pour la création d\'exemples d\'apprentissage pour les embeddings.') 
+parser.add_argument('--vocab_size', default=20, help='The number of real-word embeddings to learn')
+parser.add_argument('--context_size', default=2, help='The size of the context window on each side of the target word')
+parser.add_argument('--negative_examples', default=5, help='The number of negative examples per positive example')
+parser.add_argument('--embedding_dim', default=10, help='The size of the word embeddings')
+parser.add_argument('--sampling', default=0.75, help='The sampling rate to calculate the negative example distribution probability')
+parser.add_argument('--n_epochs', default=5, help='The number of epochs to train for')
+parser.add_argument('--batch_size', default=150, help='The number of examples in a batch')
+parser.add_argument('--learning_rate', default=0.05, help='The learning rate step when training')
+parser.add_argument('--verbose', default=True, help='Verbose mode?')
+parser.add_argument('--debug', default=False, help='Debug mode ?')
+args = parser.parse_args()
 
-#print(extract_corpus("mini_corpus.txt"))
 
