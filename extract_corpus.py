@@ -88,3 +88,8 @@ if __name__ == "__main__":
   extract_corpus("./EP.tcs.melt.utf8.c", 100, "./test.json")
 
 #TODO argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument('corpus_path', default=None, type=str, help='Path to files used to create examples.') 
+  parser.add_argument('--number_sentences', default=0, help='Number of sentences to be extracted')
+  parser.add_argument('--save_path', default="./", type=str, help='Path where to save files')
+  args = parser.parse_args()
