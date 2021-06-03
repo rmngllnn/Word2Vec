@@ -1,7 +1,11 @@
 """ Word2Vec.py
 For command line instructions, see README.
 
-TODO déserialisation
+TODO questions à Candito :
+- loss relative au nombre d'exemples ?
+- arrêt de l'apprentissage ?
+- bonnes pratiques en terme de séparation du code en classes et/ou programmes et/ou modules
+
 TODO argparse
 TODO sauvegarde des embeddings
 TODO script pour tester les différents hyperparamètres
@@ -37,6 +41,9 @@ class Word2Vec(nn.Module):
   Actually, some of them could be arguments of train()...?
   TODO also later on, see how long the code gets and if we want to split it up or not
 
+  verbose             bool, verbose mode
+  debug               bool, debug mode
+
   vocab_size          int, the number of real-word embeddings to learn
   context_size        int, the size of the context window on each side of the target word
                       if = 2, then for each word, four positive examples are created:
@@ -47,16 +54,7 @@ class Word2Vec(nn.Module):
   embedding_dim       int, the size of the word embeddings
   sampling            float, the sampling rate to calculate the negative example distribution probability
 
-  number_epochs       int, the number of epochs to train for
-  batch_size          int, the number of examples in a batch
-  learning_rate       float, the learning rate step when training
-
-  verbose             bool, verbose mode
-  debug               bool, debug mode
-
-  tokenized_doc         list of lists of strings, a tokenized doc made of sentences made of words,
-                        as created by extract_corpus() for example
-                        special words are not yet present
+  tokenized_doc         lsit of lists of strings, tokenized corpus, no special words yet
   indexed_doc           list of lists of ints, the same doc, indexes instead of tokens, special words in
   occurence_counter     Counter object, occurence_counter["word"] = occurence_count(int)
   prob_dist             dict, prob_dist["word"] = probability of the word getting sampled
@@ -68,31 +66,34 @@ class Word2Vec(nn.Module):
   target_embeddings     Embeddings, the weights of the "hidden" layer for each target word,
                         and the final learned embeddings
   context_embeddings    Embeddings, the representation of each context word, the input for forward/predict
-
-  optimizer             SGD, for the gradient descent in train
   """
-  def __init__(self, tokenized_doc,
-      context_size = 2,
-      embedding_dim = 10,
-      sampling = 0.75,
-      negative_examples = 5,
-      vocab_size = 20,
-      number_epochs = 5,
-      learning_rate = 0.05,
-      batch_size = 150,
-      verbose = True,
-      debug = False):
+  def __init__(self, corpus_path,
+      context_size,
+      embedding_dim,
+      sampling,
+      negative_examples,
+      vocab_size,
+      verbose,
+      debug):
     """ Initializes the model.
     TODO once we're done, put the default values to the best ones
+
+    -> corpus_path: string, path to the serialized tokenized doc, which is a list of lists of strings,
+    a tokenized doc made of sentences made of words, special words are not yet present
+    -> all the rest: see the description of the attributes of the class
     """
     super(Word2Vec, self).__init__()
 
+    assert type(debug) is bool, "Problem with debug."
     self.debug = debug
+
+    assert type(verbose) is bool, "Problem with verbose."
     self.verbose = verbose
 
-    assert type(tokenized_doc) is list and type(tokenized_doc[0]) is list and \
-      type(tokenized_doc[0][0] is str), "Problem with tokenized_doc."
-    self.tokenized_doc = tokenized_doc
+    assert type(corpus_path), "Problem with corpus_path."
+    self.tokenized_doc = deserialize(corpus_path)
+    assert type(self.tokenized_doc) is list and type(self.tokenized_doc[0]) is list and \
+      type(self.tokenized_doc[0][0] is str), "Problem with the corpus."
     if self.debug:
       print("Tokenized doc (first three sentences): "+str(self.tokenized_doc[0:3]))
 
@@ -111,15 +112,6 @@ class Word2Vec(nn.Module):
     assert type(negative_examples) is int and negative_examples > 0, "Problem with negative_examples."
     self.negative_examples = negative_examples
 
-    assert type(number_epochs) is int and number_epochs > 0, "Problem with number_epochs."
-    self.number_epochs = number_epochs
-
-    assert type(learning_rate) is float and learning_rate > 0, "Problem with learning_rate."
-    self.learning_rate = learning_rate
-
-    assert type(batch_size) is int and batch_size > 0, "Problem with batch_size."
-    self.batch_size = batch_size
-
     if self.verbose:
       print("\nWord2Vec SKipGram model with negative sampling.")
       print("\nParameters:")
@@ -128,9 +120,6 @@ class Word2Vec(nn.Module):
       print("embedding dimensions = " + str(self.embedding_dim))
       print("sampling rate = " + str(self.sampling))
       print("negative examples per positive example = " + str(self.negative_examples))
-      print("number of epochs = " + str(self.number_epochs))
-      print("learning rate = " + str(self.learning_rate))
-      print("batch size = " + str(self.batch_size))
 
     self.occurence_counter = self.__get_occurence_counter()
     self.i2w = [token for token in self.occurence_counter]
@@ -148,7 +137,6 @@ class Word2Vec(nn.Module):
     self.context_embeddings.weight.data.uniform_(-0,0)
     if verbose: print("\nEmbeddings initialized.")
 
-    self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate)
     if self.verbose: print("\nReady to train!")
 
 
@@ -284,20 +272,35 @@ class Word2Vec(nn.Module):
     return scores
 
 
-  def train(self):
+  def train(self, number_epochs,
+      learning_rate,
+      batch_size):
     """ Executes gradient descent to learn the embeddings.
     This is where we switch to tensors: we need the examples to be in a list in order to shuffle them,
     but after that, for efficiency, we do all calculations using matrices.
 
+    -> number_epochs: int, the number of epochs to train for
+    -> batch_size: int, the number of examples in a batch
+    -> learning_rate: float, the learning rate step when training
     <- loss_over_epochs: list of ints, loss per epoch of training
     """
-    if self.verbose: print("\nTraining...")
-    loss_over_epochs = []
+    assert type(number_epochs) is int and number_epochs > 0, "Problem with number_epochs."
+    assert type(learning_rate) is float and learning_rate > 0, "Problem with learning_rate."
+    assert type(batch_size) is int and batch_size > 0, "Problem with batch_size."
 
-    for epoch in range(self.number_epochs):
+    if self.verbose:
+      print("\nnumber of epochs = " + str(number_epochs))
+      print("learning rate = " + str(learning_rate))
+      print("batch size = " + str(batch_size))
+      print("\nTraining...")
+
+    loss_over_epochs = []
+    self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
+
+    for epoch in range(number_epochs):
       epoch_loss = 0
       random.shuffle(self.examples)
-      batches = torch.split(torch.tensor(self.examples), self.batch_size)
+      batches = torch.split(torch.tensor(self.examples), batch_size)
 
       for batch in batches:
         target_words = batch[:,0]
@@ -318,6 +321,15 @@ class Word2Vec(nn.Module):
       loss_over_epochs.append(epoch_loss.item())
     if self.verbose: print("Training done!")
     return loss_over_epochs
+
+
+  def save_embeddings(self, save_path):
+    """ Saves the embeddings.
+
+    -> save_path: string, path of the file to save as
+    """
+    pass
+
 
 
 class Evaluation() :
@@ -375,31 +387,27 @@ class Evaluation() :
     coeff = stats.spearmanr(x2n, y2n, axis=None)
 
     return coeff
-  
 
 
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser()
+  parser.add_argument('corpus_path', type=str, default="test.json", help='Path to the serialized tokenized corpus.') 
+  parser.add_argument('--vocab_size', type=int, default=20, help='The number of real-word embeddings to learn')
+  parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
+  parser.add_argument('--negative_examples', type=int, default=5, help='The number of negative examples per positive example')
+  parser.add_argument('--embedding_dim', type=int, default=10, help='The size of the word embeddings')
+  parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')
+  parser.add_argument('--number_epochs', type=int, default=5, help='The number of epochs to train for')
+  parser.add_argument('--batch_size', type=int, default=150,  help='The number of examples in a batch')
+  parser.add_argument('--learning_rate', type=int, default=0.05, help='The learning rate step when training')
+  parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode?')
+  parser.add_argument('--debug', type=bool, default=False, help='Debug mode ?')
+  args = parser.parse_args()
 
-test_doc = [["This","is","a", "test."], ["Test."]]
-tokenized_doc = extract_corpus("mini_corpus.txt")
-model = Word2Vec(tokenized_doc, batch_size=10, number_epochs=200, verbose = True, debug = False)
-loss_over_time = model.train()
-W = model.target_embeddings.weight.data #Tensor type
-C = model.context_embeddings.weight.data #Tensor type
 
-
-#PARTIE MAIN
-parser = argparse.ArgumentParser()
-parser.add_argument('examples_file', default=None, help='Corpus utilisé pour la création d\'exemples d\'apprentissage pour les embeddings.') 
-parser.add_argument('--vocab_size', default=20, help='The number of real-word embeddings to learn')
-parser.add_argument('--context_size', default=2, help='The size of the context window on each side of the target word')
-parser.add_argument('--negative_examples', default=5, help='The number of negative examples per positive example')
-parser.add_argument('--embedding_dim', default=10, help='The size of the word embeddings')
-parser.add_argument('--sampling', default=0.75, help='The sampling rate to calculate the negative example distribution probability')
-parser.add_argument('--n_epochs', default=5, help='The number of epochs to train for')
-parser.add_argument('--batch_size', default=150, help='The number of examples in a batch')
-parser.add_argument('--learning_rate', default=0.05, help='The learning rate step when training')
-parser.add_argument('--verbose', default=True, help='Verbose mode?')
-parser.add_argument('--debug', default=False, help='Debug mode ?')
-args = parser.parse_args()
+  model = Word2Vec(args.corpus_path, args.context_size, args.embedding_dim, args.sampling, args.negative_examples, args.vocab_size, args.verbose, args.debug)
+  loss_over_time = model.train(batch_size=args.batch_size, number_epochs=args.number_epochs, learning_rate=args.learning_rate)
+  W = model.target_embeddings.weight.data #Tensor type
+  C = model.context_embeddings.weight.data #Tensor type
 
 
