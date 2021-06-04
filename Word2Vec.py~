@@ -1,7 +1,7 @@
 """ Word2Vec.py
 For command line instructions, see README.
 
-TODO questions à Mme Candito :
+TODO questions à Candito :
 - loss relative au nombre d'exemples ?
 - arrêt de l'apprentissage : surapprentissage ou plus d'apprentissage ?
 - bonnes pratiques en terme de séparation du code en classes et/ou programmes et/ou modules
@@ -14,7 +14,7 @@ TODO organisation :
 TODO script bash pour tester les différents hyperparamètres
 TODO README instructions
 TODO rapport (17)
-TODO soutenance (24 Juin 10h40)
+TODO soutenance (23~24)
 """
 
 import torch
@@ -317,8 +317,6 @@ class Word2Vec(nn.Module):
         batch_loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
         # probability we want to associate with the example (gold_tag) and the probability measured by
         # the model (score))
-        # cross-entropy!
-        #batch_los = torch.sum((-1)*gold_tags*np.log(scores)-(1-gold_tag)*np.log(1-scores))
         epoch_loss += batch_loss
 
         self.zero_grad() # Reinitialising model gradients.
