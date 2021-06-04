@@ -1,6 +1,7 @@
 """ SpearmanEvaluation.py
 Not meant to be used on its own.
 https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
+
 TODO verbose/debug
 """
 
@@ -9,7 +10,7 @@ from scipy import stats
 import torch.nn as nn
 import torch.nn.functional as F
 
-class SpearmanEvaluation: # TODO euh on met ça dans une classe, dans un programme, dans une méthode de W2V, ...?
+class SpearmanEvaluation:
   """ Evaluates embeddings thanks to a human-scored corpus of word pair similarities.
   
   learned_embeddings  Embeddings, word embeddings to evaluate
@@ -32,6 +33,7 @@ class SpearmanEvaluation: # TODO euh on met ça dans une classe, dans un program
     self.debug = debug
     self.pairs, self.gold_scores = self.__extract_corpus(similarity_file_path)
     self.learned_embeddings = learned_embeddings
+    if verbose: print("Evaluation initialized.")
 
 
   def __extract_corpus(self, path):
@@ -39,10 +41,9 @@ class SpearmanEvaluation: # TODO euh on met ça dans une classe, dans un program
     """
     pairs = []
     scores = []
-
+    if self.verbose: print("Extracting human scores...")
     with open(path, 'r', encoding="utf-8") as f:
       for line in f.readlines():
-        #if self.verbose: print(line)
         word1, word2, score = line.split(" ")
         if word1 in self.w2i: # TODO c'est pas très beau comme code ça ^^"
           word1 = self.w2i[word1]
@@ -55,6 +56,8 @@ class SpearmanEvaluation: # TODO euh on met ça dans une classe, dans un program
 
         pairs.append([word1, word2])
         scores.append(float(score))
+        if self.verbose: print(line)
+        if self.debug: print(str(word1)+" "+str(word2)+" "+str(score))
         
     return torch.tensor(pairs), torch.tensor(scores)
 
@@ -82,6 +85,7 @@ class SpearmanEvaluation: # TODO euh on met ça dans une classe, dans un program
     scores = torch.mul(word1_embeds, word2_embeds)
     scores = torch.sum(scores, dim=1)
     scores = F.logsigmoid(scores)
+    # TODO même code à peu de chose près que dans forward -> emballer ça dans une fonction
     correlation, pvalue = stats.spearmanr(self.gold_scores, self.learned_scores, axis=None)
     return correlation, pvalue
 

@@ -9,4 +9,6 @@ http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.a.tg
 http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.b.tgz
 http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.c.tgz 
 
-
+1) run the extract_corpus program or otherwise creates a json file of a tokenized doc.
+2) run extract_examples on that file, with whatever hyperparameters you want.
+3) run Word2Vec on the resulting file.
