@@ -62,7 +62,7 @@ class ExampleCorpus:
         self.number_neg_examples = number_neg_examples
 
         if self.verbose:
-            print("\nCreating examples.")
+            print("\Started example extraction.")
             print("\nParameters:")
             print("context size = " + str(self.context_size))
             print("max vocabulary size = " + str(self.vocab_size))
@@ -160,7 +160,9 @@ class ExampleCorpus:
         examples = []
         if self.debug: print("\nCreating examples...")
 
-        for sentence in self._indexed_doc: # For each sentence...
+        for i, sentence in enumerate(self._indexed_doc): # For each sentence...
+            if self.verbose and i % 100 == 0:
+                print(str(i)+"\t"+str(len(self._indexed_doc)))
             for target_i in range(self.context_size, len(sentence) - self.context_size): # For each word of the actual sentence...
                     for context_i in range(target_i - self.context_size, target_i + self.context_size + 1): # For each word in the context window...
                         if target_i is not context_i:
