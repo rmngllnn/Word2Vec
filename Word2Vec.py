@@ -39,7 +39,9 @@ class Word2Vec(nn.Module):
   verbose               bool, verbose mode
   debug                 bool, debug mode
 
-  #TODO add embedding_dim and iw2 w2i
+  embedding_dim         int, the size of the word embeddings learned
+  iw2                   list of strings, index to word translator
+  w2i                   dict, word to index translator
   target_embeddings     Embeddings, the weights of the "hidden" layer for each target word,
                         and the final learned embeddings
   context_embeddings    Embeddings, the representation of each context word, the input for forward/predict
@@ -83,42 +85,6 @@ class Word2Vec(nn.Module):
     assert type(embedding_dim) is int and embedding_dim > 0, "Problem with embedding_dim"
     self.embedding_dim = embedding_dim
 
-    """assert type(self.tokenized_doc) is list and type(self.tokenized_doc[0]) is list and \
-      type(self.tokenized_doc[0][0] is str), "Problem with the corpus."
-    if self.debug:
-      print("Tokenized doc (first three sentences): "+str(self.tokenized_doc[0:3]))
-
-    assert type(context_size) is int and context_size > 0, "Problem with context_size."
-    self.context_size = context_size
-
-    assert type(vocab_size) is int and vocab_size > 0, "Problem with vocab_size."
-    self.vocab_size = vocab_size
-
-    assert type(embedding_dim) is int and embedding_dim > 0, "Problem with embedding_dim."
-    self.embedding_dim = embedding_dim
-
-    assert type(sampling) is float and sampling > 0 and sampling < 1, "Problem with sampling."
-    self.sampling = sampling
-
-    assert type(negative_examples) is int and negative_examples > 0, "Problem with negative_examples."
-    self.negative_examples = negative_examples
-
-    if self.verbose:
-      print("\nWord2Vec SKipGram model with negative sampling.")
-      print("\nParameters:")
-      print("context size = " + str(self.context_size))
-      print("max vocabulary size = " + str(self.vocab_size))
-      print("embedding dimensions = " + str(self.embedding_dim))
-      print("sampling rate = " + str(self.sampling))
-      print("negative examples per positive example = " + str(self.negative_examples))
-
-    self.occurence_counter = self.__get_occurence_counter()
-    self.i2w = [token for token in self.occurence_counter]
-    self.w2i = {w: i for i, w in enumerate(self.i2w)}
-    self.indexed_doc = self.__get_indexed_doc()
-    self.prob_dist =  self.__get_prob_dist()
-    self.examples = self.__create_examples()"""
-
     self.target_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True)
     self.context_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True) # NOTE Changed the first dimension from vocab_size to len of vocabulary, because the first is actually the max vocab size and not the actual vocab size
 
@@ -131,108 +97,6 @@ class Word2Vec(nn.Module):
     if self.verbose: print("Evaluator initialized.")
     if self.verbose: print("\nReady to train!")
 
-  """
-  def __get_occurence_counter(self):
-    Generates the occurence count with only the vocab_size most common words and the special words.
-    Special words: UNK, *D1*, ...
-
-    NOTE: We did consider using CountVectorizer but couldn't figure out how to deal with unknown words, which we do want to count too, because we need to create negative examples with them to create the other embeddings, and we need their distribution for that. TODO: double check, do we?
-
-    NOTE: a Counter will give a count of 0 for an unknown word and a dict will not, which might be useful at some point, so we kept the Counter. TODO: double check at the end, does it help or not?
-
-    NOTE: The occurence_counter need to be set before we replace rare words with UNK and add *D1* and all.
-    That's because otherwise, a special word might not appear often enough to make the cut.
-    We presumed that adding a few embeddings to the size wouldn't change much in terms of computation.
-    However, it's absolutely possible to change it so that we keep vocab_size as the total number of
-    embeddings learned, an only learn vocab_size - 2*self.context_size - 1 real word embeddings.
-    
-    occurence_counter = Counter() # We want to count the number of occurences of each token, to only keep the VOCAB_SIZE most common ones.
-
-    for sentence in self.tokenized_doc:
-      occurence_counter.update(sentence) # cf https://docs.python.org/3/library/collections.html#collections.Counter
-
-    if len(occurence_counter.keys()) - self.vocab_size > 0: # If there are tokens left over...
-      #print("total:"+str(occurence_counter))
-      UNK_counter = {token : count for (token, count)
-          in occurence_counter.most_common()[self.vocab_size:]} # (it's actually a dict not a counter but shrug, doesn't matter for what we're doing with it)
-      #print("unk: "+str(UNK_counter))
-      occurence_counter.subtract(UNK_counter) # all those other tokens are deleted from the occurence count...
-      #print("after subtract:"+str(occurence_counter))
-      occurence_counter.update({"UNK": sum([UNK_counter[token] for token in UNK_counter])}) # and counted as occurences of UNK.
-
-    occurence_counter.update({out_of_bounds : len(self.tokenized_doc) for out_of_bounds
-        in ["*D"+str(i)+"*" for i in range(1,self.context_size+1)]
-        + ["*F"+str(i)+"*" for i in range(1,self.context_size+1)]}) # We add one count of each out-of-bound special word per sentence.
-
-    if self.verbose: print("\nOccurence counter created.")
-    if self.debug: print("Occurence count: "+str(+occurence_counter))
-    return +occurence_counter # "+" removes 0 or negative count elements.
-
-
-  def __get_indexed_doc(self):
-    Generates an indexized version of the tokenized doc, adding out of bound and unknown special words.
-
-    NOTE: If we wanted to adapt this model for other uses (for example, evaluating the 'likelihood' of a
-    document), we'd probably need to adapt this method somehow, either for preprocessing input in main or
-    for use in pred/forward. Since we don't care about that, it's set to private.
-    
-    known_vocab_doc = []
-    for sentence in self.tokenized_doc:
-      sentence = ["*D"+str(i)+"*" for i in range(1,self.context_size+1)] + sentence + \
-        ["*F"+str(i)+"*" for i in range(1,self.context_size+1)] # We add out-of-bound special words.
-      for i, token in enumerate(sentence):
-        if token not in self.w2i: # If we don't know a word...
-          sentence[i] = "UNK" # we replace it by UNK.
-      known_vocab_doc.append(sentence) # when I tried to change the tokenized doc directly, the changes got lost, sooo TODO Cécile : look into how referencing works in python again...
-
-    # We switch to indexes instead of string tokens.
-    indexed_doc = [[self.w2i[token] for token in sentence] for sentence in known_vocab_doc]
-
-    if self.verbose: print("\nIndexed doc created.")
-    if self.debug: print("Indexed doc: "+str(indexed_doc[0:3]))
-    return indexed_doc
-
-
-  def __get_prob_dist(self):
-    Generates the probability distribution of known words to get sampled as negative examples.
-    
-    prob_dist = {}
-
-    total_word_count = sum([self.occurence_counter[word]**self.sampling for word in self.occurence_counter])
-    for word in self.occurence_counter:
-      prob_dist[word] = (self.occurence_counter[word]**self.sampling)/total_word_count
-
-    if self.verbose: print("\nProbability distribution created.")
-    if self.debug: print("Probability distribution: "+str(prob_dist))
-    return prob_dist
-
-
-  def __create_examples(self):
-    Creates positive and negative examples using negative sampling.
-
-    An example is a (target word, context word, gold tag) tuple.
-    It is tagged 1 for positive (extracted from the corpus) and 0 for negative (randomly created).
-    # TODO adapt that +/- to work with pred and/or loss
-    
-    examples = []
-    if self.debug: print("\nCreating examples...")
-
-    for sentence in self.indexed_doc: # For each sentence...
-      for target_i in range(self.context_size, len(sentence) - self.context_size): # For each word of the actual sentence...
-        for context_i in range(target_i - self.context_size, target_i + self.context_size + 1): # For each word in the context window...
-          if target_i is not context_i:
-            examples.append((sentence[target_i], sentence[context_i], 1))
-            if self.debug: print(self.i2w[sentence[target_i]]+","+self.i2w[sentence[context_i]]+",1")
-            
-        for sample in range(self.negative_examples): # Now, negative sampling! Using that probability distribution.
-          random_token = np.random.choice(list(self.prob_dist.keys()), p=list(self.prob_dist.values()))
-          if self.debug: print(self.i2w[sentence[target_i]]+","+random_token+",0")
-          #TODO special words seem kind of overrepresented? to test
-          examples.append((sentence[target_i], self.w2i[random_token], 0))
-    
-    if self.verbose: print("\nPositive and negative examples created.")
-    return examples
-  """
 
   def forward(self, target_ids, context_ids, train=True):
     """ Calculates the probability of an example being found in the corpus, for all examples given.
@@ -322,7 +186,7 @@ class Word2Vec(nn.Module):
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
 
-        if batches_seen*batch_size % 1000 == 0:
+        if batches_seen*batch_size % 10000 == 0:
           with torch.no_grad():
             target_ids = dev_set[:,0]
             context_ids = dev_set[:,1]
@@ -367,13 +231,9 @@ if __name__ == "__main__":
   parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus.')
   parser.add_argument('eval_corpus_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs.')
   parser.add_argument('save_embeddings_path', type=str, default="embeddings.txt", help='Path to the file for the learned embeddings.') 
-  """parser.add_argument('--vocab_size', type=int, default=20, help='The number of real-word embeddings to learn')
-  parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
-  parser.add_argument('--negative_examples', type=int, default=5, help='The number of negative examples per positive example')
-  parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')"""
-  parser.add_argument('--embedding_dim', type=int, default=10, help='The size of the word embeddings')
-  parser.add_argument('--number_epochs', type=int, default=50, help='The number of epochs to train for')
-  parser.add_argument('--batch_size', type=int, default=150,  help='The number of examples in a batch')
+  parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings')
+  parser.add_argument('--number_epochs', type=int, default=10, help='The number of epochs to train for')
+  parser.add_argument('--batch_size', type=int, default=100,  help='The number of examples in a batch')
   parser.add_argument('--learning_rate', type=int, default=0.05, help='The learning rate step when training')
   parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
   parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
@@ -388,16 +248,6 @@ if __name__ == "__main__":
     eval_corpus_path = args.eval_corpus_path,
     verbose = args.verbose,
     debug = args.debug)
-
-  """model = Word2Vec(example_corpus_path = args.example_corpus_path,
-    eval_corpus_path = args.eval_corpus_path,
-    context_size = args.context_size,
-    embedding_dim = args.embedding_dim,
-    sampling = args.sampling,
-    negative_examples = args.negative_examples,
-    vocab_size = args.vocab_size,
-    verbose = args.verbose,
-    debug = args.debug)"""
 
   results = model.train(batch_size=args.batch_size,
     number_epochs=args.number_epochs,

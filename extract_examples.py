@@ -18,7 +18,7 @@ class ExampleCorpus:
     verbose             bool, verbose mode
     debug               bool, debug mode
 
-    vocab_size          int, the number of real-word embeddings to learn
+    max_vocab_size          int, the number of real-word embeddings to learn
     context_size        int, the size of the context window on each side of the target word
                         if = 2, then for each word, four positive examples are created:
                         (x-2,x,+), (x-1,x,+), (x+1,x,+), (x+2,x,+)
@@ -34,7 +34,8 @@ class ExampleCorpus:
     def __init__(self,
             tokenized_doc,
             context_size,
-            vocab_size,
+            max_vocab_size,
+            min_occurences,
             sampling,
             number_neg_examples,
             debug,
@@ -52,8 +53,11 @@ class ExampleCorpus:
         assert type(context_size) is int and context_size > 0, "Problem with context_size."
         self.context_size = context_size
 
-        assert type(vocab_size) is int and vocab_size > 0, "Problem with vocab_size."
-        self.vocab_size = vocab_size
+        assert type(max_vocab_size) is int, "Problem with max_vocab_size."
+        self.max_vocab_size = max_vocab_size
+
+        assert type(min_occurences) is int, "Problem with max_vocab_size."
+        self.min_occurences = min_occurences
 
         assert type(sampling) is float and sampling > 0 and sampling < 1, "Problem with sampling."
         self.sampling = sampling
@@ -65,7 +69,8 @@ class ExampleCorpus:
             print("\Started example extraction.")
             print("\nParameters:")
             print("context size = " + str(self.context_size))
-            print("max vocabulary size = " + str(self.vocab_size))
+            print("max vocabulary size = " + str(self.max_vocab_size))
+            print("min occurences to learn an embedding = "+str(self.min_occurences))
             print("sampling rate = " + str(self.sampling))
             print("negative examples per positive example = " + str(self.number_neg_examples))
         
@@ -77,8 +82,10 @@ class ExampleCorpus:
         self.examples = self.__create_examples()
         
     def __get_occurence_counter(self):
-        """Generates the occurence count with only the vocab_size most common words and the special words.
+        """Generates the occurence count with only the max_vocab_size most common words and the special words.
         Special words: UNK, *D1*, ...
+
+        cf https://docs.python.org/3/library/collections.html#collections.Counter
 
         NOTE: We did consider using CountVectorizer but couldn't figure out how to deal with unknown words, which we do want to count too, because we need to create negative examples with them to create the other embeddings, and we need their distribution for that. TODO: double check, do we?
 
@@ -87,22 +94,27 @@ class ExampleCorpus:
         NOTE: The occurence_counter need to be set before we replace rare words with UNK and add *D1* and all.
         That's because otherwise, a special word might not appear often enough to make the cut.
         We presumed that adding a few embeddings to the size wouldn't change much in terms of computation.
-        However, it's absolutely possible to change it so that we keep vocab_size as the total number of
-        embeddings learned, an only learn vocab_size - 2*self.context_size - 1 real word embeddings.
+        However, it's absolutely possible to change it so that we keep max_vocab_size as the total number of
+        embeddings learned, an only learn max_vocab_size - 2*self.context_size - 1 real word embeddings.
         """
-        occurence_counter = Counter() # We want to count the number of occurences of each token, to only keep the VOCAB_SIZE most common ones.
+        occurence_counter = Counter() # We want to count the number of occurences of each token, to only keep the max_vocab_size most common ones.
 
         for sentence in self._tokenized_doc:
-            occurence_counter.update(sentence) # cf https://docs.python.org/3/library/collections.html#collections.Counter
+            occurence_counter.update(sentence)
 
-        if len(occurence_counter.keys()) - self.vocab_size > 0: # If there are tokens left over...
-            #print("total:"+str(occurence_counter))
-            UNK_counter = {token : count for (token, count)
-                    in occurence_counter.most_common()[self.vocab_size:]} # (it's actually a dict not a counter but shrug, doesn't matter for what we're doing with it)
-            #print("unk: "+str(UNK_counter))
-            occurence_counter.subtract(UNK_counter) # all those other tokens are deleted from the occurence count...
-            #print("after subtract:"+str(occurence_counter))
-            occurence_counter.update({"UNK": sum([UNK_counter[token] for token in UNK_counter])}) # and counted as occurences of UNK.
+        UNK_counter = Counter()
+
+        if self.max_vocab_size > 0 and self.max_vocab_size < len(occurence_counter.keys()): # If a maximum
+            # vocab size has been set, and we're over it...
+            UNK_counter.update({token : count for (token, count)
+                    in occurence_counter.most_common()[self.max_vocab_size:]})
+
+        if self.min_occurences > 0: # if a minimum occurence count has been set...
+            UNK_counter.update({token : count for (token, count) in occurence_counter.items()
+                    if count >= self.min_occurences})  
+        
+        occurence_counter.subtract(UNK_counter) # All those other tokens are deleted from the occurence count...
+        occurence_counter.update({"UNK": sum([UNK_counter[token] for token in UNK_counter])}) # and counted as occurences of UNK.
 
         occurence_counter.update({out_of_bounds : len(self._tokenized_doc) for out_of_bounds
             in ["*D"+str(i)+"*" for i in range(1,self.context_size+1)]
@@ -192,8 +204,9 @@ class ExampleCorpus:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('corpus_path', type=str, default="tokenized_doc.json", help='Path to the serialized tokenized corpus.')
-    parser.add_argument('save_as', type=str, default="example_corpus.json", help='Path to the serialized tokenized corpus.')
-    parser.add_argument('--vocab_size', type=int, default=1000, help='The maximum number of real-word embeddings to learn')
+    parser.add_argument('save_as', type=str, default="example_corpus.json", help='Path to the serialized tokenized corpus')
+    parser.add_argument('--max_vocab_size', type=int, default=0, help='The maximum number of real-word embeddings to learn, to set to 0 if not applicable')
+    parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences for a word to be leared')
     parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
     parser.add_argument('--number_neg_examples', type=int, default=3, help='The number of negative examples per positive example')
     parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')
@@ -207,9 +220,9 @@ if __name__ == "__main__":
         context_size = args.context_size,
         sampling = args.sampling,
         number_neg_examples = args.number_neg_examples,
-        vocab_size = args.vocab_size,
+        max_vocab_size = args.max_vocab_size,
+        min_occurences = args.min_occurences,
         verbose = args.verbose,
         debug = args.debug)
 
     serialize(corpus.to_dict(), args.save_as)
-    print(corpus.i2w)

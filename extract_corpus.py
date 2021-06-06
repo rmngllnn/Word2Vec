@@ -9,6 +9,7 @@ TODO test avec des subfolders ?
 import os
 import argparse
 from serialisation import serialize
+import random
 
 def extract_file(infile):
   """Extracts a file, gets rid of the POS tags, tokenizes it.
@@ -29,9 +30,9 @@ def extract_file(infile):
   return tokenized_doc
 
 
-def extract_corpus(corpus_path, number_files, verbose):
-  """ Extracts, tokenizes and serializes a set number of files.
-  If that number < 1, will take all files.
+def extract_corpus(corpus_path, number_files, number_sentences, verbose):
+  """ Extracts, tokenizes and serializes a set number of sentences from a set number of files.
+  If that number < 1, will take all.
   The corpus folder should only contain text files, subfolders will be ignored.
 
   NOTE: a file contains 100 000 lines, one folder contains 25 files, we have 3 folders.
@@ -39,21 +40,26 @@ def extract_corpus(corpus_path, number_files, verbose):
   TODO: test with subfolders
 
   -> corpus_path: string, path to the corpus folder
-  -> number_files: int, total number of sentences to be extracted
+  -> number_files: int, total number of files to be extracted
+  -> number_sentences: int, total number of sentences to be included in the doc
   <- corpus_doc: list of lists of strings, the final tokenized doc
   """
   file_list = os.listdir(corpus_path)
+  file_list = [file for file in file_list if file[0] != '.' for file in file_list]
+
+  if number_files > 0 and number_files < len(file_list):
+    random.shuffle(file_list)
+    file_list = file_list[:number_files]
+
   corpus_doc = []
-
-  if number_files < 1: number_files = len(file_list) # If < 1, then we take as many files as there are.
-
   for file in file_list:
-    if number_files == 0: break # We only extract however many files we want.
-    if file[0] != '.': # To avoid hidden files...
-      if verbose: print(file)
-      corpus_doc.extend(extract_file(corpus_path+'/'+file))
-      number_files -= 1
+    if verbose: print(file)
+    corpus_doc.extend(extract_file(corpus_path+'/'+file))
   
+  if number_sentences < len(corpus_doc) and number_sentences > 0:
+    random.shuffle(corpus_doc)
+    corpus_doc = corpus_doc[:number_sentences]
+
   if verbose:
     print("First 3 sentences: ")
     print(corpus_doc[:3])
@@ -66,10 +72,11 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('corpus_path', default=None, type=str, help='Path to folder with the raw text files') 
   parser.add_argument('save_path', default="./corpus.json", type=str, help='Path to the file to be created')
-  parser.add_argument('--number_files', default=0, type=int, help='Number of files to be extracted')
+  parser.add_argument('--number_files', default=1, type=int, help='Number of files to be extracted')
+  parser.add_argument('--number_sentences', default=1000, type=int, help='Number of sentences to be returned')
   parser.add_argument('--verbose', default=True, type=bool, help='Verbose mode')
   args = parser.parse_args()
 
-  corpus_doc = extract_corpus(corpus_path = args.corpus_path, number_files = args.number_files, verbose=args.verbose)
+  corpus_doc = extract_corpus(corpus_path = args.corpus_path, number_files = args.number_files, number_sentences = args.number_sentences, verbose=args.verbose)
 
   serialize(corpus_doc, args.save_path)
