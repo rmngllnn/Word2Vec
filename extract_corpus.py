@@ -29,7 +29,7 @@ def extract_file(infile):
   return tokenized_doc
 
 
-def extract_corpus(corpus_path, save_path, number_files, verbose):
+def extract_corpus(corpus_path, number_files, verbose):
   """ Extracts, tokenizes and serializes a set number of files.
   If that number < 1, will take all files.
   The corpus folder should only contain text files, subfolders will be ignored.
@@ -40,7 +40,7 @@ def extract_corpus(corpus_path, save_path, number_files, verbose):
 
   -> corpus_path: string, path to the corpus folder
   -> number_files: int, total number of sentences to be extracted
-  -> save_path: string, path to the file to be created
+  <- corpus_doc: list of lists of strings, the final tokenized doc
   """
   file_list = os.listdir(corpus_path)
   corpus_doc = []
@@ -57,16 +57,19 @@ def extract_corpus(corpus_path, save_path, number_files, verbose):
   if verbose:
     print("First 3 sentences: ")
     print(corpus_doc[:3])
+    print("Number of sentences: "+ str(len(corpus_doc)))
     
-  serialize(corpus_doc, save_path)
+  return corpus_doc
 
   
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
-  parser.add_argument('corpus_path', default=None, type=str, help='Path to folder with the raw text files.') 
+  parser.add_argument('corpus_path', default=None, type=str, help='Path to folder with the raw text files') 
+  parser.add_argument('save_path', default="./corpus.json", type=str, help='Path to the file to be created')
   parser.add_argument('--number_files', default=0, type=int, help='Number of files to be extracted')
-  parser.add_argument('--save_path', default="./corpus.json", type=str, help='Path to the file to be created')
   parser.add_argument('--verbose', default=True, type=bool, help='Verbose mode')
   args = parser.parse_args()
 
-  extract_corpus(corpus_path = args.corpus_path, save_path = args.save_path, number_files = args.number_files, verbose=args.verbose)
+  corpus_doc = extract_corpus(corpus_path = args.corpus_path, number_files = args.number_files, verbose=args.verbose)
+
+  serialize(corpus_doc, args.save_path)

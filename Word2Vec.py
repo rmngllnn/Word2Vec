@@ -1,14 +1,8 @@
 """ Word2Vec.py
+Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
 
 
-
-TODO questions à Mme Candito :
-- loss relative au nombre d'exemples ?
-- arrêt de l'apprentissage : surapprentissage ou plus d'apprentissage ?
-- bonnes pratiques en terme de séparation du code en classes et/ou programmes et/ou modules
-- on met quoi dans le compte-rendu ?
-
-TODO l'éval à continuer...
+TODO arrêt de l'apprentissage
 TODO script bash pour tester les différents hyperparamètres
 TODO README instructions
 TODO rapport (17)
@@ -25,8 +19,7 @@ import argparse
 import random
 from serialisation import deserialize
 from serialisation import serialize
-from extract_examples import ExampleCorpus
-import SpearmanEvaluation
+from SpearmanEvaluation import SpearmanEvaluation
 
 torch.manual_seed(1)
 
@@ -46,20 +39,25 @@ class Word2Vec(nn.Module):
   verbose               bool, verbose mode
   debug                 bool, debug mode
 
-  example_corpus        ExampleCorpus, with the examples and the i2w/w2i translators
+  #TODO add embedding_dim and iw2 w2i
   target_embeddings     Embeddings, the weights of the "hidden" layer for each target word,
                         and the final learned embeddings
   context_embeddings    Embeddings, the representation of each context word, the input for forward/predict
   """
   def __init__(self,
-      example_corpus_path,
+      examples,
+      i2w,
+      w2i,
+      embedding_dim,
       eval_corpus_path,
       verbose,
       debug):
     """ Initializes the model.
     TODO once we're done, put the default values to the best ones
 
-    -> example_corpus_path: string, path to the serialized ExampleCorpus json file
+    -> examples: list of lists of ints, the examples
+    -> i2w: list, index to word translator
+    -> w2i: dict, word to int translator
     -> eval_corpus_path: string, path to the human-scored similarity pairs text file
     -> verbose: verbose mode
     -> debug: debug mode
@@ -72,9 +70,19 @@ class Word2Vec(nn.Module):
     assert type(verbose) is bool, "Problem with verbose."
     self.verbose = verbose
 
-    assert type(example_corpus_path) is str, "Problem with example_corpus_path."
-    self.example_corpus = deserialize(example_corpus_path)
-    assert type(self.example_corpus) is ExampleCorpus, "Problem with example corpus"
+    assert type(examples) is list and type(examples[0]) is list and type(examples[0][0] is int), \
+      "Problem with example corpus"
+    self.examples = examples
+
+    assert type(w2i) is dict, "Problem with w2i"
+    self.w2i = w2i
+
+    assert type(i2w) is list, "Problem with i2w"
+    self.i2w = i2w
+
+    assert type(embedding_dim) is int and embedding_dim > 0, "Problem with embedding_dim"
+    self.embedding_dim = embedding_dim
+
     """assert type(self.tokenized_doc) is list and type(self.tokenized_doc[0]) is list and \
       type(self.tokenized_doc[0][0] is str), "Problem with the corpus."
     if self.debug:
@@ -104,7 +112,6 @@ class Word2Vec(nn.Module):
       print("sampling rate = " + str(self.sampling))
       print("negative examples per positive example = " + str(self.negative_examples))
 
-    # self.examples_corpus = Examples(context_size, vocab_size, ...)
     self.occurence_counter = self.__get_occurence_counter()
     self.i2w = [token for token in self.occurence_counter]
     self.w2i = {w: i for i, w in enumerate(self.i2w)}
@@ -112,15 +119,15 @@ class Word2Vec(nn.Module):
     self.prob_dist =  self.__get_prob_dist()
     self.examples = self.__create_examples()"""
 
-    self.target_embeddings = nn.Embedding(len(self.example_corpus.i2w), self.example_corpus.embedding_dim, sparse=True)
-    self.context_embeddings = nn.Embedding(len(self.example_corpus.i2w), self.example_corpus.embedding_dim, sparse=True) # NOTE Changed the first dimension from vocab_size to len of vocabulary, because the first is actually the max vocab size and not the actual vocab size
+    self.target_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True)
+    self.context_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True) # NOTE Changed the first dimension from vocab_size to len of vocabulary, because the first is actually the max vocab size and not the actual vocab size
 
-    range = 0.5/self.example_corpus.embedding_dim
+    range = 0.5/self.embedding_dim
     self.target_embeddings.weight.data.uniform_(-range,range)
     self.context_embeddings.weight.data.uniform_(-0,0)
     if self.verbose: print("\nEmbeddings initialized.")
 
-    self.spearman = SpearmanEvaluation(eval_corpus_path, self.example_corpus.w2i, self.target_embeddings, self.verbose, self.debug)
+    self.spearman = SpearmanEvaluation(eval_corpus_path, self.w2i, self.target_embeddings, self.verbose, self.debug)
     if self.verbose: print("Evaluator initialized.")
     if self.verbose: print("\nReady to train!")
 
@@ -293,8 +300,8 @@ class Word2Vec(nn.Module):
     spearman_over_time = []
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
-    train_set = self.example_corpus.examples[0:len(self.example_corpus.examples)*80/100] # TODO quel pourcentage?
-    dev_set = self.example_corpus.examples[len(self.example_corpus.examples)*80/100:]
+    train_set = self.examples[0:int(len(self.examples)*80/100)] # TODO quel pourcentage?
+    dev_set = torch.tensor(self.examples[int(len(self.examples)*80/100):])
 
     for epoch in range(number_epochs):
       random.shuffle(train_set)
@@ -315,16 +322,16 @@ class Word2Vec(nn.Module):
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
 
-        if batches_seen % 1000 == 0:
+        if batches_seen*batch_size % 1000 == 0:
           with torch.no_grad():
             target_ids = dev_set[:,0]
             context_ids = dev_set[:,1]
             gold_tags = dev_set[:,2]
-            scores = self(target_ids, context_ids, train=False) #TODO nograd ??
-            loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.example_corpus.examples)
+            scores = self(target_ids, context_ids, train=False)
+            loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.examples)
             loss_over_time.append(loss)
 
-            spearman_coeff = self.spearman.evaluate()
+            spearman_coeff = self.spearman.evaluate(scores)
             spearman_over_time.append(spearman_coeff)
 
             examples_over_time.append(batches_seen*batch_size)
@@ -335,7 +342,12 @@ class Word2Vec(nn.Module):
         batches_seen += 1
 
     if self.verbose: print("Training done!")
-    return loss_over_epochs, spearman_over_epochs
+
+    results = {}
+    results["examples"] = examples_over_time
+    results["loss"] = loss_over_time
+    results["spearman"] = spearman_over_time
+    return results
 
 
   def save_embeddings(self, save_path):
@@ -343,47 +355,53 @@ class Word2Vec(nn.Module):
 
     -> save_path: string, path of the file to save as
     """
-    serialize(self.target_embeddings, save_path)
-
-  def eval(self):
+    #serialize(self.target_embeddings, save_path)
+    # TODO TypeError: Object of type Embedding is not JSON serializable
     pass
 
 
 
 
-    
-
-
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
-  parser.add_argument('corpus_path', type=str, default="test.json", help='Path to the serialized tokenized corpus.')
-  parser.add_argument('eval_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs.') 
-  parser.add_argument('--vocab_size', type=int, default=20, help='The number of real-word embeddings to learn')
+  parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus.')
+  parser.add_argument('eval_corpus_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs.')
+  parser.add_argument('save_embeddings_path', type=str, default="embeddings.txt", help='Path to the file for the learned embeddings.') 
+  """parser.add_argument('--vocab_size', type=int, default=20, help='The number of real-word embeddings to learn')
   parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
   parser.add_argument('--negative_examples', type=int, default=5, help='The number of negative examples per positive example')
+  parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')"""
   parser.add_argument('--embedding_dim', type=int, default=10, help='The size of the word embeddings')
-  parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')
-  parser.add_argument('--number_epochs', type=int, default=5, help='The number of epochs to train for')
+  parser.add_argument('--number_epochs', type=int, default=50, help='The number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=150,  help='The number of examples in a batch')
   parser.add_argument('--learning_rate', type=int, default=0.05, help='The learning rate step when training')
   parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
   parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
   args = parser.parse_args()
 
+  example_dict = deserialize(args.example_corpus_path)
 
-  model = Word2Vec(corpus_path = args.corpus_path,
-    eval_path = args.eval_path,
+  model = Word2Vec(examples = example_dict["examples"],
+    i2w = example_dict["i2w"],
+    w2i = example_dict["w2i"],
+    embedding_dim = args.embedding_dim,
+    eval_corpus_path = args.eval_corpus_path,
+    verbose = args.verbose,
+    debug = args.debug)
+
+  """model = Word2Vec(example_corpus_path = args.example_corpus_path,
+    eval_corpus_path = args.eval_corpus_path,
     context_size = args.context_size,
     embedding_dim = args.embedding_dim,
     sampling = args.sampling,
     negative_examples = args.negative_examples,
     vocab_size = args.vocab_size,
     verbose = args.verbose,
-    debug = args.debug)
+    debug = args.debug)"""
 
-  loss_over_epochs, spearman_over_epochs = model.train(batch_size=args.batch_size,
+  results = model.train(batch_size=args.batch_size,
     number_epochs=args.number_epochs,
     learning_rate=args.learning_rate)
 
-
+  #model.save_embeddings(args.save_embeddings_path)
 

@@ -41,7 +41,7 @@ class SpearmanEvaluation:
     """
     pairs = []
     scores = []
-    if self.verbose: print("Extracting human scores...")
+    if self.verbose: print("Extracting human similarity scores...")
     with open(path, 'r', encoding="utf-8") as f:
       for line in f.readlines():
         word1, word2, score = line.split(" ")
@@ -56,12 +56,11 @@ class SpearmanEvaluation:
 
         pairs.append([word1, word2])
         scores.append(float(score))
-        if self.verbose: print(line)
         if self.debug: print(str(word1)+" "+str(word2)+" "+str(score))
         
     return torch.tensor(pairs), torch.tensor(scores)
 
-  def evaluate(self):
+  def evaluate(self, scores):
     """ Calculates the Spearman correlation coefficient with p-value between the gold similarity scores
     and the similarity scores calculated by the model.
 
@@ -80,14 +79,15 @@ class SpearmanEvaluation:
     <- pvalue: float
     The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
     """
-    word1_embeds = self.learned_embeddings(self.pairs[:0])
-    word2_embeds = self.learned_embeddings(self.pairs[:1])
+    word1_embeds = self.learned_embeddings(self.pairs[:,0])
+    word2_embeds = self.learned_embeddings(self.pairs[:,1])
     scores = torch.mul(word1_embeds, word2_embeds)
     scores = torch.sum(scores, dim=1)
     scores = F.logsigmoid(scores)
-    # TODO même code à peu de chose près que dans forward -> emballer ça dans une fonction
-    correlation, pvalue = stats.spearmanr(self.gold_scores, self.learned_scores, axis=None)
+    # TODO même code à peu de chose près que dans forward -> emballer ça dans une fonction ?
+    correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None)
     return correlation, pvalue
+    # TODO SpearmanRConstantInputWarning: An input array is constant; the correlation coefficent is not defined.
 
 if __name__ == "__main__":
     print("This file isn't meant to be launched on it's own...")
