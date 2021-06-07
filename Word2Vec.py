@@ -218,10 +218,16 @@ class Word2Vec(nn.Module):
     """ Saves the embeddings.
 
     -> save_path: string, path of the file to save as
+    Documentation : https://pytorch.org/docs/stable/notes/serialization.html
     """
     #serialize(self.target_embeddings, save_path)
     # TODO TypeError: Object of type Embedding is not JSON serializable
-    pass
+
+    torch.save(self.target_embeddings, save_path)
+
+    """
+    torch.save(self.state_dict(), save_path)
+    """
 
 
 
@@ -253,5 +259,5 @@ if __name__ == "__main__":
     number_epochs=args.number_epochs,
     learning_rate=args.learning_rate)
 
-  #model.save_embeddings(args.save_embeddings_path)
+  model.save_embeddings(args.save_embeddings_path)
 
