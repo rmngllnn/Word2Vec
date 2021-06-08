@@ -171,7 +171,8 @@ class Word2Vec(nn.Module):
     for epoch in range(number_epochs):
       random.shuffle(train_set)
       batches = torch.split(torch.tensor(train_set), batch_size)
-
+      early_stopping = False
+      
       for batch in batches:
         target_ids = batch[:,0]
         context_ids = batch[:,1]
@@ -195,6 +196,9 @@ class Word2Vec(nn.Module):
             scores = self(target_ids, context_ids, train=False)
             loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.examples)
             #loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))*1000/len(self.examples)
+            if len(loss_over_time) > 0 and (loss - loss_over_time[len(loss_over_time)-1]) > -0.01 : #TODO : la condition -0.01 en hyperparamètres aussi?
+              early_stopping = True
+              break
             loss_over_time.append(loss)
 
             spearman_coeff = self.spearman.evaluate(scores)
@@ -204,6 +208,11 @@ class Word2Vec(nn.Module):
 
             if self.verbose:
               print("examples "+str(batches_seen*batch_size)+", loss = "+str(loss)+", spearman = "+str(spearman_coeff))
+
+          if early_stopping :
+            if self.verbose :
+              print("Loss is no longer evoluting : stop the training.")
+            break
         
         batches_seen += 1
 
@@ -225,17 +234,16 @@ class Word2Vec(nn.Module):
   def save_embeddings(self, save_path):
     """ Saves the embeddings.
 
-    -> save_path: string, path of the file to save as
+    -> save_path: string, path of the file to save as (fotmat .pt)
     Documentation : https://pytorch.org/docs/stable/notes/serialization.html
     """
     #serialize(self.target_embeddings, save_path)
     # TODO TypeError: Object of type Embedding is not JSON serializable
 
     torch.save(self.target_embeddings, save_path)
-
-    """
-    torch.save(self.target_embeddings.state_dict()['weight'], save_path)
-    """
+    #TODO : à choisir entre l'une ou l'autre notation (revient au même en fait)
+    #torch.save(self.target_embeddings.state_dict()['weight'], save_path)
+    
 
 
 
@@ -244,7 +252,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus.')
   parser.add_argument('eval_corpus_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs.')
-  parser.add_argument('save_embeddings_path', type=str, default="embeddings.txt", help='Path to the file for the learned embeddings.') 
+  parser.add_argument('save_embeddings_path', type=str, default="embeddings.pt", help='Path to the file for the learned embeddings.') 
   parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings')
   parser.add_argument('--number_epochs', type=int, default=10, help='The number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=100,  help='The number of examples in a batch')

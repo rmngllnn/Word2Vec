@@ -20,6 +20,7 @@ import random
 from serialisation import deserialize
 from serialisation import serialize
 from SpearmanEvaluation import SpearmanEvaluation
+import matplotlib.pyplot as plt
 
 torch.manual_seed(1)
 
@@ -181,7 +182,7 @@ class Word2Vec(nn.Module):
         # probability we want to associate with the example (gold_tag) and the probability measured by
         # the model (score))
         # cross-entropy!
-        # batch_loss = torch.sum((-1)*gold_tags*np.log(scores)-(1-gold_tag)*np.log(1-scores))
+        # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
         self.zero_grad() # Reinitialising model gradients.
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
@@ -193,6 +194,7 @@ class Word2Vec(nn.Module):
             gold_tags = dev_set[:,2]
             scores = self(target_ids, context_ids, train=False)
             loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.examples)
+            #loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))*1000/len(self.examples)
             loss_over_time.append(loss)
 
             spearman_coeff = self.spearman.evaluate(scores)
@@ -211,6 +213,12 @@ class Word2Vec(nn.Module):
     results["examples"] = examples_over_time
     results["loss"] = loss_over_time
     results["spearman"] = spearman_over_time
+
+    if self.verbose :
+      fig, ax = plt.subplots()
+      ax.plot(results["examples"], results["loss"])
+      plt.show()
+      
     return results
 
 
@@ -226,7 +234,7 @@ class Word2Vec(nn.Module):
     torch.save(self.target_embeddings, save_path)
 
     """
-    torch.save(self.state_dict(), save_path)
+    torch.save(self.target_embeddings.state_dict()['weight'], save_path)
     """
 
 
