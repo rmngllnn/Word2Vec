@@ -52,7 +52,7 @@ class SpearmanEvaluation:
         else:
           word2 = self.word2vec.w2i['UNK']
 
-        pairs.append([word1, word2])
+        pairs.append([word1, word2, 0])
         scores.append(float(score))
         if self.word2vec.debug: print(str(word1)+" "+str(word2)+" "+str(score))
         
@@ -78,7 +78,7 @@ class SpearmanEvaluation:
     <- pvalue: float
     The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
     """
-    scores = self.word2vec.forward(self.pairs[:,0], self.pairs[:,1], train=False)
+    loss, scores = self.word2vec.loss_scores(self.pairs, train=False)
     correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
     return correlation, pvalue
     # TODO SpearmanRConstantInputWarning: An input array is constant; the correlation coefficent is not defined.

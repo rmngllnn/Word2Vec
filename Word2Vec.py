@@ -96,7 +96,7 @@ class Word2Vec(nn.Module):
     if self.verbose: print("\nReady to train!")
 
 
-  def forward(self, target_ids, context_ids, train=True):
+  def forward(self, target_embeds, context_embeds, train=True):
     """ Calculates the probability of an example being found in the corpus, for all examples given.
     That is to say, the probability of a context word being found in the window of a context word.
     P(c|t) = sigmoid(c.t)
@@ -104,11 +104,32 @@ class Word2Vec(nn.Module):
     We'll worry about the gold tags later, when we calculate the loss.
     P(¬c|t) = 1 - P(c|t)
 
-    -> target_ids: tensor, shape: (batch_size), line tensor of target word indexes
-    -> context_ids: tensor, shape: (batch_size), line tensor of context word indexes
-    -> train: boolean, whether to use both target and context embeddings or just target embeddings
+    -> target_embeds
+    -> context_embeds
     <- scores: tensor, shape: (batch_size), line tensor of scores
     """
+    scores = torch.mul(target_embeds, context_embeds)
+    if self.debug: print("mul: "+str(scores))
+    scores = torch.sum(scores, dim=1)
+    if self.debug: print("sum: "+str(scores))
+    scores = F.logsigmoid(scores)
+    if self.debug: print("sig: "+str(scores))
+
+    return scores
+
+
+  def loss_scores(self, set, train=True):
+    """ Calculates the loss on a set of examples.
+
+    -> set
+    -> train
+    <- loss
+    < scores
+    """
+    target_ids = set[:,0]
+    context_ids = set[:,1]
+    gold_tags = set[:,2]
+
     target_embeds = self.target_embeddings(target_ids)
     context_embeds = None
     if train:
@@ -123,15 +144,15 @@ class Word2Vec(nn.Module):
       print("Context ids: "+str(context_ids))
       print("Target embeddings: "+str(target_embeds))
       print("Context embeddings: "+str(context_embeds))
-    scores = torch.mul(target_embeds, context_embeds)
-    if self.debug: print("mul: "+str(scores))
-    scores = torch.sum(scores, dim=1)
-    if self.debug: print("sum: "+str(scores))
-    scores = F.logsigmoid(scores)
-    if self.debug: print("sig: "+str(scores))
 
-    return scores
+    scores = self(target_embeds, context_embeds) # Forward propagation.
+    loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
+        # probability we want to associate with the example (gold_tag) and the probability measured by
+        # the model (score))
+        # cross-entropy! # TODO loss function
+        # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
 
+    return loss, scores
 
   def train(self,
       number_epochs,
@@ -172,16 +193,7 @@ class Word2Vec(nn.Module):
       batches = torch.split(torch.tensor(train_set), batch_size)
       
       for batch in batches:
-        target_ids = batch[:,0]
-        context_ids = batch[:,1]
-        gold_tags = batch[:,2]
-
-        scores = self(target_ids, context_ids) # Forward propagation.
-        batch_loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
-        # probability we want to associate with the example (gold_tag) and the probability measured by
-        # the model (score))
-        # cross-entropy! # TODO loss function
-        # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
+        batch_loss, batch_scores = self.loss_scores(batch)
         self.zero_grad() # Reinitialising model gradients.
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
@@ -189,15 +201,10 @@ class Word2Vec(nn.Module):
 
         if batches_seen*batch_size % 10000 == 0: # Every 10 000 examples, amount can be adjusted.
           with torch.no_grad(): # We DO NOT want it to count toward training.
-            target_ids = dev_set[:,0]
-            context_ids = dev_set[:,1]
-            gold_tags = dev_set[:,2]
-            scores = self(target_ids, context_ids, train=False) # Only using target embeddings.
-            loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.examples) # TODO...
-            #loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))*1000/len(self.examples)
-            results["loss"].append(loss.item())
+            dev_loss, dev_scores = self.loss_scores(dev_set)
+            results["loss"].append(dev_loss.item())
 
-            spearman_coeff = self.spearman.evaluate(scores)
+            spearman_coeff = self.spearman.evaluate(dev_scores)
             results["spearman"].append(spearman_coeff)
 
             results["examples"].append(batches_seen*batch_size)
@@ -206,7 +213,7 @@ class Word2Vec(nn.Module):
               print("examples "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
 
             if len(results["loss"]) > 1 and \
-              (loss - results["loss"][-2]) > -0.01:
+              (dev_loss - results["loss"][-2]) > -0.01:
               #TODO : la condition -0.01 en hyperparamètres aussi?
 
               if self.verbose:
