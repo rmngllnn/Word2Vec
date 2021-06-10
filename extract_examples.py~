@@ -10,7 +10,6 @@ from serialisation import serialize
 from collections import Counter
 import numpy as np
 import argparse
-import random as rd
 
 class ExampleCorpus:
     """ Corpus of examples, created based on a serialized tokenized doc and the given parameters.
@@ -176,9 +175,8 @@ class ExampleCorpus:
         for i, sentence in enumerate(self._indexed_doc): # For each sentence...
             if self.verbose and i % 100 == 0:
                 print(str(i)+"\t"+str(len(self._indexed_doc)))
-            sampled_context_size = rd.randint(1, self.context_size)
-            for target_i in range(sampled_context_size, len(sentence) - sampled_context_size): # For each word of the actual sentence...
-                    for context_i in range(target_i - sampled_context_size, target_i + sampled_context_size + 1): # For each word in the context window...
+            for target_i in range(self.context_size, len(sentence) - self.context_size): # For each word of the actual sentence...
+                    for context_i in range(target_i - self.context_size, target_i + self.context_size + 1): # For each word in the context window...
                         if target_i is not context_i:
                                 examples.append((sentence[target_i], sentence[context_i], 1))
                                 if self.debug: print(self.i2w[sentence[target_i]]+","+self.i2w[sentence[context_i]]+",1")
