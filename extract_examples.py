@@ -1,8 +1,9 @@
 """ extract_examples.py
-Creates a corpus of examples and its indexes as an ExampleCorpus object, serializes these elements in.
+Creates a corpus of examples and its indexes as an ExampleCorpus object, serializes these elements as a
+dict in a json file.
 
 #TODO dynamic sampling of window size
-#TODO min number of occurences for a word to be learned
+#TODO optimize neg sampling
 """
 
 from serialisation import deserialize
@@ -19,13 +20,14 @@ class ExampleCorpus:
     verbose             bool, verbose mode
     debug               bool, debug mode
 
-    max_vocab_size          int, the number of real-word embeddings to learn
+    max_vocab_size      int, the maximum number of real-word embeddings to learn
     context_size        int, the size of the context window on each side of the target word
                         if = 2, then for each word, four positive examples are created:
                         (x-2,x,+), (x-1,x,+), (x+1,x,+), (x+2,x,+)
     number_neg_examples int, the number of negative examples per positive example
                         if = 2, then for each word, two negative examples are randomly created:
                         (r1, x, -), (r2, x, -)
+    min_occurences      int, the minimum number of occurences for a word to be learned
     sampling            float, sampling rate to calculate the negative example distribution probability
 
     examples            list of tuples, examples[(int)] = (context_word_id, target_word_id, pos|neg)
@@ -88,15 +90,16 @@ class ExampleCorpus:
 
         cf https://docs.python.org/3/library/collections.html#collections.Counter
 
-        NOTE: We did consider using CountVectorizer but couldn't figure out how to deal with unknown words, which we do want to count too, because we need to create negative examples with them to create the other embeddings, and we need their distribution for that. TODO: double check, do we?
+        NOTE: We did consider using CountVectorizer but couldn't figure out how to deal with unknown words, which we do want to count too, because we need to create negative examples with them to create the other embeddings, and we need their distribution for that.
 
-        NOTE: a Counter will give a count of 0 for an unknown word and a dict will not, which might be useful at some point, so we kept the Counter. TODO: double check at the end, does it help or not?
+        NOTE: a Counter will give a count of 0 for an unknown word and a dict will not.
 
         NOTE: The occurence_counter need to be set before we replace rare words with UNK and add *D1* and all.
         That's because otherwise, a special word might not appear often enough to make the cut.
         We presumed that adding a few embeddings to the size wouldn't change much in terms of computation.
-        However, it's absolutely possible to change it so that we keep max_vocab_size as the total number of
-        embeddings learned, an only learn max_vocab_size - 2*self.context_size - 1 real word embeddings.
+        However, it's absolutely possible to change it so that we keep max_vocab_size as the total number
+        of embeddings learned, an only learn max_vocab_size - 2*self.context_size - 1 real word
+        embeddings.
         """
         occurence_counter = Counter() # We want to count the number of occurences of each token, to only keep the max_vocab_size most common ones.
 
@@ -129,9 +132,9 @@ class ExampleCorpus:
     def __get_indexed_doc(self):
         """Generates an indexized version of the __tokenized doc, adding out of bound and unknown special words.
 
-        NOTE: If we wanted to adapt this model for other uses (for example, evaluating the 'likelihood' of a
-        document), we'd probably need to adapt this method somehow, either for preprocessing input in main or
-        for use in pred/forward. Since we don't care about that, it's set to private.
+        NOTE: If we wanted to adapt this model for other uses (for example, evaluating the 'likelihood'
+        of a document), we'd probably need to adapt this method somehow, either for preprocessing input
+        in main or for use in pred/forward. Since we don't care about that, it's set to private.
         """
         known_vocab_doc = []
         for sentence in self._tokenized_doc:
@@ -151,7 +154,8 @@ class ExampleCorpus:
 
 
     def __get_prob_dist(self):
-        """Generates the probability distribution of known words to get sampled as negative examples.
+        """Generates the probability distribution of words in the vocabulary to get sampled as negative
+        examples, in the form of a dictionary of prob_dist["word"] = probability
         """
         prob_dist = {}
 
@@ -169,6 +173,8 @@ class ExampleCorpus:
 
         An example is a (target word, context word, gold tag) tuple.
         It is tagged 1 for positive (extracted from the corpus) and 0 for negative (randomly created).
+
+        TODO optimize neg sampling
         """
         examples = []
         if self.debug: print("\nCreating examples...")
@@ -208,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument('corpus_path', type=str, default="tokenized_doc.json", help='Path to the serialized tokenized corpus.')
     parser.add_argument('save_as', type=str, default="example_corpus.json", help='Path to the serialized tokenized corpus')
     parser.add_argument('--max_vocab_size', type=int, default=0, help='The maximum number of real-word embeddings to learn, to set to 0 if not applicable')
-    parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences for a word to be leared')
+    parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences for a word to be learned')
     parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
     parser.add_argument('--number_neg_examples', type=int, default=3, help='The number of negative examples per positive example')
     parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')

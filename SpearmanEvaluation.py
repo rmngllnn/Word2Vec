@@ -2,7 +2,8 @@
 Not meant to be used on its own.
 https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
 
-TODO verbose/debug
+TODO verbose/debug, mais surtout refaire les commentaires
+TODO le calcul sort des trucs bizarres
 """
 
 import torch
@@ -13,54 +14,50 @@ import torch.nn.functional as F
 class SpearmanEvaluation:
   """ Evaluates embeddings thanks to a human-scored corpus of word pair similarities.
   
-  learned_embeddings  Embeddings, word embeddings to evaluate
-  w2i                 dict, word to index translator, corresponding to said word embeddings
+  word2vec            Word2Vec, the model to evaluate
   pairs               Tensor, pair ids
   gold_scores         Tensor, human_scores
-  verbose             boolean, verbose mode
-  debug               boolean, debug mode
   """
 
-  def __init__(self, similarity_file_path, w2i, learned_embeddings, verbose, debug):
+  def __init__(self, similarity_file_path, word2vec):
     """ Initializes based on a corpus of human-scored similarity pairs.
 
     -> similarity_file_path: string, path to the file with human judgment similarity scores
-    -> w2i: dict, word to index translator, reference to the same index as the model being evaluated
-    -> learned_embeddings: Embeddings, reference to the same embeddings as the model being evaluated
+    -> word2vec: Word2Vec, the model to evaluate
     """
-    self.w2i = w2i
-    self.verbose = verbose
-    self.debug = debug
+    self.word2vec = word2vec
     self.pairs, self.gold_scores = self.__extract_corpus(similarity_file_path)
-    self.learned_embeddings = learned_embeddings
-    if verbose: print("Evaluation initialized.")
+    if self.word2vec.verbose: print("Evaluation initialized.")
 
 
   def __extract_corpus(self, path):
     """ Extracts the word ids and gold scores.
-    -> path of files to extract corpus from
-    <- tensors of examples and tensors of similarity scores
+
+    -> path: str, path to the corpus file
+    <- pairs: tensor of word id pairs
+    <- scores: tensor of similarity scores
     """
     pairs = []
     scores = []
-    if self.verbose: print("Extracting human similarity scores...")
+    if self.word2vec.verbose: print("Extracting human similarity scores...")
     with open(path, 'r', encoding="utf-8") as f:
       for line in f.readlines():
         word1, word2, score = line.split(" ")
-        if word1 in self.w2i: # TODO c'est pas très beau comme code ça ^^"
-          word1 = self.w2i[word1]
+        if word1 in self.word2vec.w2i: # TODO c'est pas très beau comme code ça ^^"
+          word1 = self.word2vec.w2i[word1]
         else:
-          word1 = self.w2i['UNK']
-        if word2 in self.w2i:
-          word2 = self.w2i[word2]
+          word1 = self.word2vec.w2i['UNK']
+        if word2 in self.word2vec.w2i:
+          word2 = self.word2vec.w2i[word2]
         else:
-          word2 = self.w2i['UNK']
+          word2 = self.word2vec.w2i['UNK']
 
         pairs.append([word1, word2])
         scores.append(float(score))
-        if self.debug: print(str(word1)+" "+str(word2)+" "+str(score))
+        if self.word2vec.debug: print(str(word1)+" "+str(word2)+" "+str(score))
         
     return torch.tensor(pairs), torch.tensor(scores)
+
 
   def evaluate(self, scores):
     """ Calculates the Spearman correlation coefficient with p-value between the gold similarity scores
@@ -81,20 +78,10 @@ class SpearmanEvaluation:
     <- pvalue: float
     The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
     """
-    word1_embeds = self.learned_embeddings(self.pairs[:,0])
-    word2_embeds = self.learned_embeddings(self.pairs[:,1])
-    scores = torch.mul(word1_embeds, word2_embeds)
-    scores = torch.sum(scores, dim=1)
-    scores = F.logsigmoid(scores)
-    # TODO même code à peu de chose près que dans forward -> emballer ça dans une fonction ?
+    scores = self.word2vec.forward(self.pairs[:,0], self.pairs[:,1], train=False)
     correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
     return correlation, pvalue
     # TODO SpearmanRConstantInputWarning: An input array is constant; the correlation coefficent is not defined.
 
 if __name__ == "__main__":
     print("This file isn't meant to be launched on it's own...")
-    print("But okay let's test it.")
-    w2i = {}
-    w2i['UNK'] = 0
-    embeddings = nn.Embedding(1, 10, sparse=True)
-    test = SpearmanEvaluation("similarity.txt", w2i, embeddings, True, True)

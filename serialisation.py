@@ -9,10 +9,6 @@ import json
 def serialize(data, save_as):
     """ Serializes data in a json file saved on desktop.
 
-    TODO est-ce qu'on peut préciser l'emplacement du fichier à sauvegarder ?
-    est-ce que switcher de nom à path ferait l'affaire...?
-    bon on test
-
     -> data: any, the object you want to serialize
     -> save_as: string, the path of the file you want to create, don't forget the
     .json extension
@@ -24,8 +20,8 @@ def serialize(data, save_as):
 def deserialize(infile):
     """ Reads a json file and returns its contents.
 
-    -> infile: string, path to the json file. Don't forget the ".json" extension.
-    <- list of words
+    -> infile: string, path to the json file. Don't forget the ".json" extension!
+    <- data: whatever
     """
     data = None
     with open(infile) as json_data:

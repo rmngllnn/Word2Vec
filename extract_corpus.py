@@ -1,9 +1,9 @@
 """ extract_corpus.py
-Extracts, tokenizes and serializes all the files in a folder.
-Calibrated for the "L'Est Républicain" corpus, though you do have to put all the files in one single
-folder prior to running.
+Extracts, tokenizes and serializes a given number of sentences (or all) from the files in a folder.
+Calibrated for the "L'Est Républicain" corpus, see extract_file() and README.
+Warning, be careful to put all the files in one single folder prior to running.
 
-TODO test avec des subfolders ?
+TODO (optionnel) test avec des subfolders ?
 """
 
 import os
@@ -37,11 +37,10 @@ def extract_corpus(corpus_path, number_files, number_sentences, verbose):
 
   NOTE: a file contains 100 000 lines, one folder contains 25 files, we have 3 folders.
 
-  TODO: test with subfolders
-
   -> corpus_path: string, path to the corpus folder
   -> number_files: int, total number of files to be extracted
   -> number_sentences: int, total number of sentences to be included in the doc
+  -> verbose: bool, verbose mode
   <- corpus_doc: list of lists of strings, the final tokenized doc
   """
   file_list = os.listdir(corpus_path)
@@ -73,7 +72,7 @@ if __name__ == "__main__":
   parser.add_argument('corpus_path', default=None, type=str, help='Path to folder with the raw text files') 
   parser.add_argument('save_path', default="./corpus.json", type=str, help='Path to the file to be created')
   parser.add_argument('--number_files', default=1, type=int, help='Number of files to be extracted')
-  parser.add_argument('--number_sentences', default=1000, type=int, help='Number of sentences to be returned')
+  parser.add_argument('--number_sentences', default=1000, type=int, help='Number of sentences to be saved')
   parser.add_argument('--verbose', default=True, type=bool, help='Verbose mode')
   args = parser.parse_args()
 

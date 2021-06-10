@@ -1,9 +1,8 @@
 """ Word2Vec.py
 Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
 
-
 TODO arrêt de l'apprentissage
-TODO script bash pour tester les différents hyperparamètres
+TODO programme python pour tester les différents hyperparamètres
 TODO README instructions
 TODO rapport (17)
 TODO soutenance (24 Juin 10h40)
@@ -14,11 +13,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import argparse
-#import numpy as np
-#from collections import Counter
 import random
-from serialisation import deserialize
-from serialisation import serialize
+from serialisation import deserialize, serialize
 from SpearmanEvaluation import SpearmanEvaluation
 import matplotlib.pyplot as plt
 
@@ -28,9 +24,9 @@ torch.manual_seed(1)
 class Word2Vec(nn.Module):
   """ Word2Vec model, SkipGram version with negative sampling.
   Creates word embeddings from a corpus of examples using gradient descent.
-  Evaluates performance with loss per 1000 examples and spearman coefficient.
+  Evaluates performance with loss per 1000 examples and spearman coefficient. TODO màj une fois fait
 
-  Use the train method to calculate the embeddings, TODO save
+  Use the train method to calculate the embeddings, then the save method to save them.
 
   The model learns:
   - one embedding for each of the vocab_size most frequent word tokens,
@@ -46,6 +42,7 @@ class Word2Vec(nn.Module):
   target_embeddings     Embeddings, the weights of the "hidden" layer for each target word,
                         and the final learned embeddings
   context_embeddings    Embeddings, the representation of each context word, the input for forward/predict
+  spearman              SpearmanEvaluator, used to evaluate the embeddings
   """
   def __init__(self,
       examples,
@@ -94,7 +91,7 @@ class Word2Vec(nn.Module):
     self.context_embeddings.weight.data.uniform_(-0,0)
     if self.verbose: print("\nEmbeddings initialized.")
 
-    self.spearman = SpearmanEvaluation(eval_corpus_path, self.w2i, self.target_embeddings, self.verbose, self.debug)
+    self.spearman = SpearmanEvaluation(eval_corpus_path, self)
     if self.verbose: print("Evaluator initialized.")
     if self.verbose: print("\nReady to train!")
 
@@ -117,7 +114,8 @@ class Word2Vec(nn.Module):
     if train:
       context_embeds = self.context_embeddings(context_ids)
     else:
-      context_embeds = self.target_embeddings(context_ids)
+      context_embeds = self.target_embeddings(context_ids) # So the same method is used for training and
+      # for the equivalent of predicting
 
     if self.debug:
       print("\nForward propagation on batch.")
@@ -146,7 +144,7 @@ class Word2Vec(nn.Module):
     -> number_epochs: int, the number of epochs to train for
     -> batch_size: int, the number of examples in a batch
     -> learning_rate: float, the learning rate step when training
-    <- loss_over_epochs: list of ints, loss per epoch of training
+    <- results: dict, results of evaluation over time TODO màj quand c'est fait
     """
     assert type(number_epochs) is int and number_epochs > 0, "Problem with number_epochs."
     assert type(learning_rate) is float and learning_rate > 0, "Problem with learning_rate."
@@ -160,9 +158,10 @@ class Word2Vec(nn.Module):
       print("\nTraining...")
 
     batches_seen = 0
-    examples_over_time = []
-    loss_over_time = []
-    spearman_over_time = []
+    results = {}
+    results["examples"] = []
+    results["loss"] = []
+    results["spearman"] = []
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
     train_set = self.examples[0:int(len(self.examples)*80/100)] # TODO quel pourcentage?
@@ -171,7 +170,6 @@ class Word2Vec(nn.Module):
     for epoch in range(number_epochs):
       random.shuffle(train_set)
       batches = torch.split(torch.tensor(train_set), batch_size)
-      early_stopping = False
       
       for batch in batches:
         target_ids = batch[:,0]
@@ -182,70 +180,57 @@ class Word2Vec(nn.Module):
         batch_loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
         # probability we want to associate with the example (gold_tag) and the probability measured by
         # the model (score))
-        # cross-entropy!
+        # cross-entropy! # TODO loss function
         # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
         self.zero_grad() # Reinitialising model gradients.
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
+        batches_seen += 1
 
-        if batches_seen*batch_size % 10000 == 0:
-          with torch.no_grad():
+        if batches_seen*batch_size % 10000 == 0: # Every 10 000 examples, amount can be adjusted.
+          with torch.no_grad(): # We DO NOT want it to count toward training.
             target_ids = dev_set[:,0]
             context_ids = dev_set[:,1]
             gold_tags = dev_set[:,2]
-            scores = self(target_ids, context_ids, train=False)
-            loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.examples)
+            scores = self(target_ids, context_ids, train=False) # Only using target embeddings.
+            loss = torch.sum(torch.abs(gold_tags - scores))*1000/len(self.examples) # TODO...
             #loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))*1000/len(self.examples)
-            if len(loss_over_time) > 0 and (loss - loss_over_time[len(loss_over_time)-1]) > -0.01 : #TODO : la condition -0.01 en hyperparamètres aussi?
-              early_stopping = True
-              break
-            loss_over_time.append(loss)
+            results["loss"].append(loss.item())
 
             spearman_coeff = self.spearman.evaluate(scores)
-            spearman_over_time.append(spearman_coeff)
+            results["spearman"].append(spearman_coeff)
 
-            examples_over_time.append(batches_seen*batch_size)
+            results["examples"].append(batches_seen*batch_size)
 
             if self.verbose:
-              print("examples "+str(batches_seen*batch_size)+", loss = "+str(loss)+", spearman = "+str(spearman_coeff))
+              print("examples "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
 
-          if early_stopping :
-            if self.verbose :
-              print("Loss is no longer evoluting : stop the training.")
-            break
-        
-        batches_seen += 1
+            if len(results["loss"]) > 1 and \
+              (loss - results["loss"][-2]) > -0.01:
+              #TODO : la condition -0.01 en hyperparamètres aussi?
 
-    if self.verbose: print("Training done!")
-
-    results = {}
-    results["examples"] = examples_over_time
-    results["loss"] = loss_over_time
-    results["spearman"] = spearman_over_time
-
-    if self.verbose :
-      fig, ax = plt.subplots()
-      ax.plot(results["examples"], results["loss"])
-      plt.show()
-      
-    return results
+              if self.verbose:
+                print("Training done! Early stopping.")
+                # TODO plot ne marche pas ?
+                fig, ax = plt.subplots()
+                ax.plot(results["examples"], results["loss"], "o-")
+                plt.show()
+                
+              return results
 
 
   def save_embeddings(self, save_path):
-    """ Saves the learned embeddings.
+    """ Saves the learned embeddings, using pytorch's save method.
+    Documentation : https://pytorch.org/docs/stable/notes/serialization.html
+
+    NOTE We're not using json serializing because TypeError: Object of type Embedding is not JSON
+    serializable
 
     -> save_path: string, path of the file to save as (fotmat .pt)
-    Documentation : https://pytorch.org/docs/stable/notes/serialization.html
     """
-    #serialize(self.target_embeddings, save_path)
-    # TODO TypeError: Object of type Embedding is not JSON serializable
-
-    torch.save(self.target_embeddings, save_path)
     #TODO : à choisir entre l'une ou l'autre notation (revient au même en fait)
+    torch.save(self.target_embeddings, save_path)
     #torch.save(self.target_embeddings.state_dict()['weight'], save_path)
-    
-
-
 
 
 if __name__ == "__main__":
