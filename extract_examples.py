@@ -2,8 +2,7 @@
 Creates a corpus of examples and its indexes as an ExampleCorpus object, serializes these elements as a
 dict in a json file.
 
-#TODO dynamic sampling of window size
-#TODO optimize neg sampling
+TODO sous-ecahntillonage des mots fréquents
 """
 
 from serialisation import deserialize
@@ -199,8 +198,7 @@ class ExampleCorpus:
                 curr_time = time.time()
                 print("sentence ",i,"\t",len(examples),"\t", curr_time-start_time)
             for target_i in range(self.context_size, len(sentence) - self.context_size): # For each word of the actual sentence...
-                    #sampled_context_size = rd.randint(1, self.context_size) # We sample a context size.
-                    sampled_context_size = self.context_size
+                    sampled_context_size = rd.randint(1, self.context_size) # We sample a context size.
                     for context_i in range(target_i - sampled_context_size, target_i + sampled_context_size + 1): # For each word in the (sampled) context window...
                         if target_i is not context_i:
                                 examples.append((sentence[target_i], sentence[context_i], 1))
