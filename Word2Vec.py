@@ -204,7 +204,7 @@ class Word2Vec(nn.Module):
             dev_loss, dev_scores = self.loss_scores(dev_set)
             results["loss"].append(dev_loss.item())
 
-            spearman_coeff = self.spearman.evaluate(dev_scores)
+            spearman_coeff = self.spearman.evaluate()
             results["spearman"].append(spearman_coeff)
 
             results["examples"].append(batches_seen*batch_size)
