@@ -83,6 +83,7 @@ class SpearmanEvaluation:
     second_embeds = self.word2vec.target_embeddings(self.pairs[:,1])
     cos = nn.CosineSimilarity()
     scores = cos(first_embeds, second_embeds)
+    loss, scores = self.word2vec.calculate_loss_scores(self.pairs, train=False)
     correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
     return correlation, pvalue
     # TODO SpearmanRConstantInputWarning: An input array is constant; the correlation coefficent is not defined.
