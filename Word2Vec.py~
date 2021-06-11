@@ -112,14 +112,18 @@ class Word2Vec(nn.Module):
     if self.debug: print("mul: "+str(scores))
     scores = torch.sum(scores, dim=1)
     if self.debug: print("sum: "+str(scores))
-    scores = F.logsigmoid(scores)
+    #scores = F.logsigmoid(scores)
+    sig = nn.Sigmoid()
+    scores = sig(scores)
     if self.debug: print("sig: "+str(scores))
+
+    #print(scores)
 
     return scores
 
 
-  def loss_scores(self, set, train=True):
-    """ Calculates the loss on a set of examples.
+  def calculate_loss_scores(self, set, train=True):
+    """ Calculates the loss on a set of examples using cross-entropy.
 
     -> set
     -> train
@@ -128,7 +132,7 @@ class Word2Vec(nn.Module):
     """
     target_ids = set[:,0]
     context_ids = set[:,1]
-    gold_tags = set[:,2]
+    gold_tags = set[:,2].float()
 
     target_embeds = self.target_embeddings(target_ids)
     context_embeds = None
@@ -146,11 +150,16 @@ class Word2Vec(nn.Module):
       print("Context embeddings: "+str(context_embeds))
 
     scores = self(target_embeds, context_embeds) # Forward propagation.
-    loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
+    
+    #loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
         # probability we want to associate with the example (gold_tag) and the probability measured by
         # the model (score))
         # cross-entropy! # TODO loss function
         # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
+
+    loss_func = nn.BCELoss()
+    loss = loss_func(scores, gold_tags)
+    
 
     return loss, scores
 
@@ -193,18 +202,18 @@ class Word2Vec(nn.Module):
       batches = torch.split(torch.tensor(train_set), batch_size)
       
       for batch in batches:
-        batch_loss, batch_scores = self.loss_scores(batch)
+        batch_loss, batch_scores = self.calculate_loss_scores(batch)
         self.zero_grad() # Reinitialising model gradients.
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
         batches_seen += 1
 
-        if batches_seen*batch_size % 10000 == 0: # Every 10 000 examples, amount can be adjusted.
+        if batches_seen*batch_size % 1000 == 0: # Every 10 000 examples, amount can be adjusted.
           with torch.no_grad(): # We DO NOT want it to count toward training.
-            dev_loss, dev_scores = self.loss_scores(dev_set)
+            dev_loss, dev_scores = self.calculate_loss_scores(dev_set)
             results["loss"].append(dev_loss.item())
 
-            spearman_coeff = self.spearman.evaluate(dev_scores)
+            spearman_coeff = self.spearman.evaluate()
             results["spearman"].append(spearman_coeff)
 
             results["examples"].append(batches_seen*batch_size)
@@ -213,7 +222,7 @@ class Word2Vec(nn.Module):
               print("examples "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
 
             if len(results["loss"]) > 1 and \
-              (dev_loss - results["loss"][-2]) > -0.01:
+              (dev_loss - results["loss"][-2]) > -0.000001:
               #TODO : la condition -0.01 en hyperparamètres aussi?
 
               if self.verbose:
@@ -248,7 +257,7 @@ if __name__ == "__main__":
   parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings')
   parser.add_argument('--number_epochs', type=int, default=10, help='The number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=100,  help='The number of examples in a batch')
-  parser.add_argument('--learning_rate', type=int, default=0.05, help='The learning rate step when training')
+  parser.add_argument('--learning_rate', type=float, default=0.05, help='The learning rate step when training')
   parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
   parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
   args = parser.parse_args()

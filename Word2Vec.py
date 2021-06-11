@@ -1,7 +1,6 @@
 """ Word2Vec.py
 Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
 
-TODO arrêt de l'apprentissage
 TODO programme python pour tester les différents hyperparamètres
 TODO README instructions
 TODO rapport (17)
@@ -152,10 +151,10 @@ class Word2Vec(nn.Module):
     scores = self(target_embeds, context_embeds) # Forward propagation.
     
     #loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
-        # probability we want to associate with the example (gold_tag) and the probability measured by
-        # the model (score))
-        # cross-entropy! # TODO loss function
-        # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
+    # probability we want to associate with the example (gold_tag) and the probability measured by
+    # the model (score))
+    # cross-entropy! # TODO loss function
+    # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
 
     loss_func = nn.BCELoss()
     loss = loss_func(scores, gold_tags)
