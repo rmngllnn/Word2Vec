@@ -38,6 +38,8 @@ class SpearmanEvaluation:
 
   def __extract_corpus(self, path):
     """ Extracts the word ids and gold scores.
+    -> path of files to extract corpus from
+    <- tensors of examples and tensors of similarity scores
     """
     pairs = []
     scores = []
@@ -85,7 +87,7 @@ class SpearmanEvaluation:
     scores = torch.sum(scores, dim=1)
     scores = F.logsigmoid(scores)
     # TODO même code à peu de chose près que dans forward -> emballer ça dans une fonction ?
-    correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None)
+    correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
     return correlation, pvalue
     # TODO SpearmanRConstantInputWarning: An input array is constant; the correlation coefficent is not defined.
 
