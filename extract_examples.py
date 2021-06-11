@@ -12,6 +12,7 @@ from collections import Counter
 import numpy as np
 import argparse
 import random as rd
+import time
 
 class ExampleCorpus:
     """ Corpus of examples, created based on a serialized tokenized doc and the given parameters.
@@ -83,7 +84,8 @@ class ExampleCorpus:
         self._indexed_doc = self.__get_indexed_doc()
         self._prob_dist =  self.__get_prob_dist()
         self.examples = self.__create_examples()
-        
+
+
     def __get_occurence_counter(self):
         """Generates the occurence count with only the max_vocab_size most common words and the special words.
         Special words: UNK, *D1*, ...
@@ -169,30 +171,47 @@ class ExampleCorpus:
 
 
     def __create_examples(self):
-        """Creates positive and negative examples using negative sampling.
+        """Creates positive and negative examples using negative sampling. The window size is also sampled
+        between context_size and 1.
 
         An example is a (target word, context word, gold tag) tuple.
         It is tagged 1 for positive (extracted from the corpus) and 0 for negative (randomly created).
-
-        TODO optimize neg sampling
         """
         examples = []
-        if self.debug: print("\nCreating examples...")
+        start_time = time.time()
+
+        rng = np.random.default_rng(12345)
+        sampling_values = []
+        sampling_words = [word for word in self._prob_dist]
+        current_total_proba = 0
+        overall_total_proba = 100000
+        for word in sampling_words:
+            current_total_proba += self._prob_dist[word]*overall_total_proba
+            sampling_values.append(current_total_proba) # We create a list with the cummulative
+            # probability of each word, so that each one takes more of less 'space' in the amount
+            # based on its probability. We can then sample between 0 and the total, and each one has
+            # (approximately) that probability of being picked.
+            # This is less accurate, but quicker than the previous method.
+        if self.verbose: print("Negative example sampler created.")
 
         for i, sentence in enumerate(self._indexed_doc): # For each sentence...
             if self.verbose and i % 100 == 0:
-                print(str(i)+"\t"+str(len(self._indexed_doc)))
-            sampled_context_size = rd.randint(1, self.context_size)
-            for target_i in range(sampled_context_size, len(sentence) - sampled_context_size): # For each word of the actual sentence...
-                    for context_i in range(target_i - sampled_context_size, target_i + sampled_context_size + 1): # For each word in the context window...
+                curr_time = time.time()
+                print("sentence ",i,"\t",len(examples),"\t", curr_time-start_time)
+            for target_i in range(self.context_size, len(sentence) - self.context_size): # For each word of the actual sentence...
+                    #sampled_context_size = rd.randint(1, self.context_size) # We sample a context size.
+                    sampled_context_size = self.context_size
+                    for context_i in range(target_i - sampled_context_size, target_i + sampled_context_size + 1): # For each word in the (sampled) context window...
                         if target_i is not context_i:
                                 examples.append((sentence[target_i], sentence[context_i], 1))
                                 if self.debug: print(self.i2w[sentence[target_i]]+","+self.i2w[sentence[context_i]]+",1")
                         
-                    for neg_example in range(self.number_neg_examples): # Now, negative sampling! Using that probability distribution.
-                        random_token = np.random.choice(list(self._prob_dist.keys()), p=list(self._prob_dist.values()))
-                        if self.debug: print(self.i2w[sentence[target_i]]+","+random_token+",0")
-                        examples.append((sentence[target_i], self.w2i[random_token], 0))
+                    for neg_example in range(self.number_neg_examples): # Now, negative sampling! Using that probability distribution/sampler.
+                        random_probability = rng.integers(low=0, high=overall_total_proba)
+                        neg_rank = np.searchsorted(sampling_values, random_probability)
+                        neg_id = self.w2i[sampling_words[neg_rank]]
+                        if self.debug: print(self.i2w[sentence[target_i]]+","+self.i2w[neg_id]+",0")
+                        examples.append((sentence[target_i], neg_id, 0))
         
         if self.verbose: print("\n"+str(len(examples))+" examples created.")
         return examples
