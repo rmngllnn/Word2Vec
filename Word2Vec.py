@@ -232,7 +232,7 @@ class Word2Vec(nn.Module):
 
 
   def save_embeddings(self, save_path):
-    """ Saves the embeddings.
+    """ Saves the learned embeddings.
 
     -> save_path: string, path of the file to save as (fotmat .pt)
     Documentation : https://pytorch.org/docs/stable/notes/serialization.html
