@@ -1,6 +1,8 @@
 """ Word2Vec.py
 Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
+Generates a graph of the learning curve.
 
+TODO save performance results
 TODO programme python pour tester les différents hyperparamètres
 TODO README instructions
 TODO rapport (17)
@@ -229,14 +231,17 @@ class Word2Vec(nn.Module):
 
             if len(results["loss"]) > 1 and \
               (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
-
-              if self.verbose:
-                print("Training done! Early stopping.")
-                fig, ax = plt.subplots()
-                ax.plot(results["examples"], results["loss"], "o-")
-                plt.show()
-                
+              if self.verbose: print("Training done! Early stopping.")
+              fig, ax = plt.subplots()
+              ax.plot(results["examples"], results["loss"], "o-")
+              plt.show()
               return results
+
+    if self.verbose: print("Training done! Reached max epoch before early stopping condition.")
+    fig, ax = plt.subplots()
+    ax.plot(results["examples"], results["loss"], "o-")
+    plt.show()
+    return results
 
 
   def save_embeddings(self, save_path):
@@ -257,15 +262,15 @@ class Word2Vec(nn.Module):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
-  parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus, json format')
-  parser.add_argument('eval_corpus_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs, txt format')
-  parser.add_argument('save_embeddings_path', type=str, default="embeddings.pt", help='Path to the file for the learned embeddings, pt format') 
-  parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings')
+  parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus, json format, do not forget the extension')
+  parser.add_argument('eval_corpus_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs, txt format, do not forget the extension')
+  parser.add_argument('save_embeddings_path', type=str, default="embeddings.pt", help='Path to the file for the learned embeddings, pt format, do not forget the extension') 
+  parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings to be learned')
   parser.add_argument('--max_number_epochs', type=int, default=1000, help='The maximum number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=1000,  help='The number of examples in a batch')
   parser.add_argument('--learning_rate', type=float, default=0.1, help='The learning rate step when training')
-  parser.add_argument('--evaluate_every', type=int, default=10, help='The number of batches to train on between two evaluations.')
-  parser.add_argument('--early_stop_delta', type=float, default=0, help='Training stops once the loss improves by (less than) this amount between two evaluations.')
+  parser.add_argument('--evaluate_every', type=int, default=10, help='The number of batches to train on between two evaluations')
+  parser.add_argument('--early_stop_delta', type=float, default=0, help='Training stops once the loss improves by (less than) this amount between two evaluations')
   parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
   parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
   args = parser.parse_args()
