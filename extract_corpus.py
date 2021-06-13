@@ -70,7 +70,7 @@ def extract_corpus(corpus_path, number_files, number_sentences, verbose):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('corpus_path', default=None, type=str, help='Path to folder with the raw text files') 
-  parser.add_argument('save_path', default="./corpus.json", type=str, help='Path to the file to be created')
+  parser.add_argument('save_path', default="./tokenized_doc.json", type=str, help='Path to the file to be created')
   parser.add_argument('--number_files', default=1, type=int, help='Number of files to be extracted')
   parser.add_argument('--number_sentences', default=1000, type=int, help='Number of sentences to be saved')
   parser.add_argument('--verbose', default=True, type=bool, help='Verbose mode')

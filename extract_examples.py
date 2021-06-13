@@ -27,7 +27,7 @@ class ExampleCorpus:
     number_neg_examples int, the number of negative examples per positive example
                         if = 2, then for each word, two negative examples are randomly created:
                         (r1, x, -), (r2, x, -)
-    min_occurences      int, the minimum number of occurences for a word to be learned
+    min_occurences      int, the minimum number of occurences needed for a word to be learned
     sampling            float, sampling rate to calculate the negative example distribution probability
 
     examples            list of tuples, examples[(int)] = (context_word_id, target_word_id, pos|neg)
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument('corpus_path', type=str, default="tokenized_doc.json", help='Path to the serialized tokenized corpus.')
     parser.add_argument('save_as', type=str, default="example_corpus.json", help='Path to the serialized tokenized corpus')
     parser.add_argument('--max_vocab_size', type=int, default=0, help='The maximum number of real-word embeddings to learn, to set to 0 if not applicable')
-    parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences for a word to be learned')
+    parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences needed for a word to be learned')
     parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
     parser.add_argument('--number_neg_examples', type=int, default=3, help='The number of negative examples per positive example')
     parser.add_argument('--sampling', type=float, default=0.75, help='The sampling rate to calculate the negative example distribution probability')

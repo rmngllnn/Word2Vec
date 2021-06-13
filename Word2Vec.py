@@ -201,7 +201,7 @@ class Word2Vec(nn.Module):
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
     train_set = self.examples[0:int(len(self.examples)*80/100)] # TODO quel pourcentage?
-    dev_set = torch.tensor(self.examples[int(len(self.examples)*80/100):])
+    eval_set = torch.tensor(self.examples[int(len(self.examples)*80/100):])
 
     for epoch in range(max_number_epochs):
       random.shuffle(train_set)
@@ -216,8 +216,8 @@ class Word2Vec(nn.Module):
 
         if batches_seen % evaluate_every == 0: # Every X batches, we evaluate the embeddings.
           with torch.no_grad(): # We DO NOT want it to count toward training.
-            dev_loss, dev_scores = self.calculate_loss_scores(dev_set)
-            results["loss"].append(dev_loss.item())
+            eval_loss, eval_scores = self.calculate_loss_scores(eval_set)
+            results["loss"].append(eval_loss.item())
 
             spearman_coeff = self.spearman.evaluate()
             results["spearman"].append(spearman_coeff)
@@ -228,7 +228,7 @@ class Word2Vec(nn.Module):
               print("examples seen = "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
 
             if len(results["loss"]) > 1 and \
-              (results["loss"][-2] - dev_loss) < early_stop_delta: # If learning is slowing down enough...
+              (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
 
               if self.verbose:
                 print("Training done! Early stopping.")
