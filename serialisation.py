@@ -27,3 +27,7 @@ def deserialize(infile):
     with open(infile) as json_data:
         data = json.load(json_data)
     return data
+
+
+if __name__ == "__main__":
+    print("This file isn't meant to be launched on it's own...")
