@@ -257,7 +257,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_vocab_size', type=int, default=0, help='The maximum number of real-word embeddings to learn, to set to 0 if not applicable')
     parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences needed for a word to be learned')
     parser.add_argument('--context_size', type=int, default=5, help='The size of the context window on each side of the target word')
-    parser.add_argument('--number_neg_examples', type=int, default=3, help='The number of negative examples per positive example')
+    parser.add_argument('--number_neg_examples', type=int, default=5, help='The number of negative examples per positive example')
     parser.add_argument('--sub_sampling', type=float, default=0.0005, help='The frequency threshold above which words are considered frequent and subsampled, subsampling will be more aggressive the closer to 0 the threshold is')
     parser.add_argument('--neg_sampling', type=float, default=0.75, help='The neg_sampling rate to calculate the negative example distribution probability')
     parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
