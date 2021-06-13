@@ -133,8 +133,9 @@ class ExampleCorpus:
         rng = np.random.default_rng(12345)
         total_occurences = sum([occurence_counter[word] for word in occurence_counter])
         for word in occurence_counter:
-            if occurence_counter[word]/total_occurences > self.sub_sampling: # TODO Depending on the source consulted, subsampling is applied to all or only frequent words...?
-                proba = 1 - sqrt(self.sub_sampling/occurence_counter[word]) # probability of not keeping
+            frequency = occurence_counter[word]/total_occurences
+            if frequency > self.sub_sampling: # TODO Depending on the source consulted, subsampling is applied to all or only frequent words...?
+                proba = 1 - sqrt(self.sub_sampling/frequency) # probability of not keeping
                 # that word.
                 random = rng.random() #  We pick a float number between 0 and 1.
                 if random <= proba: # We have (proba) chance of picking a lower number and not keeping the word.
@@ -173,7 +174,7 @@ class ExampleCorpus:
         indexed_doc = [[self.w2i[token] for token in sentence] for sentence in known_vocab_doc]
 
         if self.verbose: print("\nIndexed doc created.")
-        if self.debug: print("Indexed doc: "+str(indexed_doc[0:3]))
+        # if self.debug: print("Indexed doc: "+str(indexed_doc[0:3]))
         return indexed_doc
 
 
@@ -257,7 +258,7 @@ if __name__ == "__main__":
     parser.add_argument('--min_occurences', type=int, default=3, help='The minimum number of occurences needed for a word to be learned')
     parser.add_argument('--context_size', type=int, default=2, help='The size of the context window on each side of the target word')
     parser.add_argument('--number_neg_examples', type=int, default=3, help='The number of negative examples per positive example')
-    parser.add_argument('--sub_sampling', type=float, default=0.01, help='The frequency threshold above which words are considered frequent and subsampled')
+    parser.add_argument('--sub_sampling', type=float, default=0.001, help='The frequency threshold above which words are considered frequent and subsampled, subsampling will be more aggressive the closer to 0 the threshold is')
     parser.add_argument('--neg_sampling', type=float, default=0.75, help='The neg_sampling rate to calculate the negative example distribution probability')
     parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
     parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
