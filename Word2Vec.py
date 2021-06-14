@@ -253,9 +253,18 @@ class Word2Vec(nn.Module):
 
     -> save_path: string, path of the file to save as (fotmat .pt)
     """
-    torch.save(self.target_embeddings, save_path)
+    #torch.save(self.target_embeddings, save_path)
     #torch.save(self.target_embeddings.state_dict()['weight'], save_path)
     # Both are possible, see doc.
+
+    #Other way to save embeddings into a .txt file
+    embedding = self.target_embeddings.weight.data.numpy()
+    f = open(save_path, 'w')
+    f.write('%d %d\n' % (len(self.i2w), self.embedding_dim))
+    for idx, w in enumerate(self.i2w):
+      e = embedding[idx]
+      e = ' '.join(map(lambda x: str(x), e))
+      f.write('%s %s\n' % (w, e))
 
     # TODO save results too?
 

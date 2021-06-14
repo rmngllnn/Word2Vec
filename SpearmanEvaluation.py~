@@ -3,7 +3,7 @@ Not meant to be used on its own.
 https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
 
 TODO verbose/debug, mais surtout refaire les commentaires
-TODO le calcul sort des trucs bizarres
+TODO corpus plus grand ? trop de UNK
 """
 
 import torch
@@ -12,22 +12,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SpearmanEvaluation:
-  """ Evaluates embeddings thanks to a human-scored corpus of word pair similarities.
+  """ Evaluates embeddings thanks to a corpus of human-scored word pair similarities.
   
   word2vec            Word2Vec, the model to evaluate
   pairs               Tensor, pair ids
-  gold_scores         Tensor, human_scores
+  gold_scores         Tensor, human scores
   """
 
   def __init__(self, similarity_file_path, word2vec):
     """ Initializes based on a corpus of human-scored similarity pairs.
+    Only keeps the pair of words that are known by the model (no UNK). If nan or error, check that.
 
     -> similarity_file_path: string, path to the file with human judgment similarity scores
     -> word2vec: Word2Vec, the model to evaluate
     """
     self.word2vec = word2vec
     self.pairs, self.gold_scores = self.__extract_corpus(similarity_file_path)
-    if self.word2vec.verbose: print("Evaluation initialized.")
 
 
   def __extract_corpus(self, path):
@@ -39,22 +39,18 @@ class SpearmanEvaluation:
     """
     pairs = []
     scores = []
-    if self.word2vec.verbose: print("Extracting human similarity scores...")
+    if self.word2vec.debug: print("\nExtracting human similarity scores...")
     with open(path, 'r', encoding="utf-8") as f:
       for line in f.readlines():
         word1, word2, score = line.split(" ")
-        if word1 in self.word2vec.w2i: # TODO c'est pas très beau comme code ça ^^"
-          word1 = self.word2vec.w2i[word1]
-        else:
-          word1 = self.word2vec.w2i['UNK']
-        if word2 in self.word2vec.w2i:
-          word2 = self.word2vec.w2i[word2]
-        else:
-          word2 = self.word2vec.w2i['UNK']
+        if word1 in self.word2vec.w2i and word2 in self.word2vec.w2i: # To avoid overrepresenting UNK, we
+          # do not include unknown words.
+          pairs.append([self.word2vec.w2i[word1], self.word2vec.w2i[word2], 0]) # The 0 is only there to
+          # have something in gold tag position/the right shape of input for scoring. It will not be used.
+          scores.append(float(score))
+          if self.word2vec.debug: print(word1+" "+word2+" "+score)
 
-        pairs.append([word1, word2, 0])
-        scores.append(float(score))
-        if self.word2vec.debug: print(str(word1)+" "+str(word2)+" "+str(score))
+    if len(pairs) < 2: print("Careful, Spearman corelation score won't work. Not enough of the word pairs from the similarity corpus are known by the model.")
         
     return torch.tensor(pairs), torch.tensor(scores)
 
@@ -78,15 +74,12 @@ class SpearmanEvaluation:
     <- pvalue: float
     The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
     """
-    #loss, scores = self.word2vec.loss_scores(self.pairs, train=False)
     first_embeds = self.word2vec.target_embeddings(self.pairs[:,0])
     second_embeds = self.word2vec.target_embeddings(self.pairs[:,1])
     cos = nn.CosineSimilarity()
     scores = cos(first_embeds, second_embeds)
-    loss, scores = self.word2vec.calculate_loss_scores(self.pairs, train=False)
     correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
     return correlation, pvalue
-    # TODO SpearmanRConstantInputWarning: An input array is constant; the correlation coefficent is not defined.
 
 if __name__ == "__main__":
     print("This file isn't meant to be launched on it's own...")
