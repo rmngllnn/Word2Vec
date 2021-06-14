@@ -196,6 +196,7 @@ class Word2Vec(nn.Module):
       print("\nTraining...")
 
     batches_seen = 0
+    ep = 0
     results = {}
     results["examples"] = []
     results["loss"] = []
@@ -215,8 +216,10 @@ class Word2Vec(nn.Module):
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
         batches_seen += 1
+        ep += 1
 
-        if batches_seen % evaluate_every == 0: # Every X batches, we evaluate the embeddings.
+        #if batches_seen % evaluate_every == 0: # Every X batches, we evaluate the embeddings.
+        if ep % 100 == 0:
           with torch.no_grad(): # We DO NOT want it to count toward training.
             eval_loss, eval_scores = self.calculate_loss_scores(eval_set)
             results["loss"].append(eval_loss.item())
