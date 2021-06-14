@@ -232,14 +232,23 @@ class Word2Vec(nn.Module):
             if len(results["loss"]) > 1 and \
               (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
               if self.verbose: print("Training done! Early stopping.")
+
+              #Creating plot
               fig, ax = plt.subplots()
               ax.plot(results["examples"], results["loss"], "o-")
+              fig.suptitle("loss value according to number of examples")
+              plt.xlabel('Number of examples')
+              plt.ylabel('Loss value')
               plt.show()
+
               return results
 
     if self.verbose: print("Training done! Reached max epoch before early stopping condition.")
     fig, ax = plt.subplots()
     ax.plot(results["examples"], results["loss"], "o-")
+    fig.suptitle("loss value according to number of examples")
+    plt.xlabel('Number of examples')
+    plt.ylabel('Loss value')
     plt.show()
     return results
 
