@@ -50,7 +50,10 @@ class SpearmanEvaluation:
           scores.append(float(score))
           if self.word2vec.debug: print(word1+" "+word2+" "+score)
 
-    if len(pairs) < 2: print("Careful, Spearman corelation score won't work. Not enough of the word pairs from the similarity corpus are known by the model.")
+    if len(pairs) < 1:
+      print("Careful, Spearman corelation score won't work. Not enough of the word pairs from the similarity corpus are known by the model.")
+      pairs.append([self.word2vec.w2i["UNK"], self.word2vec.w2i["UNK"], 0])
+      scores.append(0.0)
         
     return torch.tensor(pairs), torch.tensor(scores)
 
