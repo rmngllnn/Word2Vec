@@ -216,35 +216,32 @@ class Word2Vec(nn.Module):
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
         batches_seen += 1
-        ep += 1
 
-        #if batches_seen % evaluate_every == 0: # Every X batches, we evaluate the embeddings.
-        if ep % 100 == 0:
-          with torch.no_grad(): # We DO NOT want it to count toward training.
-            eval_loss, eval_scores = self.calculate_loss_scores(eval_set)
-            results["loss"].append(eval_loss.item())
+      with torch.no_grad(): # We DO NOT want it to count toward training.
+        eval_loss, eval_scores = self.calculate_loss_scores(eval_set)
+        results["loss"].append(eval_loss.item())
 
-            spearman_coeff = self.spearman.evaluate()
-            results["spearman"].append(spearman_coeff)
+        spearman_coeff = self.spearman.evaluate()
+        results["spearman"].append(spearman_coeff)
 
-            results["examples"].append(batches_seen*batch_size)
+        results["examples"].append(batches_seen*batch_size)
 
-            if self.verbose:
-              print("examples seen = "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
+        if self.verbose:
+          print("examples seen = "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
 
-            if len(results["loss"]) > 1 and \
-              (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
-              if self.verbose: print("Training done! Early stopping.")
+        if len(results["loss"]) > 1 and \
+          (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
+          if self.verbose: print("Training done! Early stopping.")
 
-              #Creating plot
-              fig, ax = plt.subplots()
-              ax.plot(results["examples"], results["loss"], "o-")
-              fig.suptitle("loss value according to number of examples")
-              plt.xlabel('Number of examples')
-              plt.ylabel('Loss value')
-              plt.show()
+          #Creating plot
+          fig, ax = plt.subplots()
+          ax.plot(results["examples"], results["loss"], "o-")
+          fig.suptitle("loss value according to number of examples")
+          plt.xlabel('Number of examples')
+          plt.ylabel('Loss value')
+          plt.show()
 
-              return results
+          return results
 
     if self.verbose: print("Training done! Reached max epoch before early stopping condition.")
     fig, ax = plt.subplots()
