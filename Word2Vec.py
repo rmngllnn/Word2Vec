@@ -114,12 +114,12 @@ class Word2Vec(nn.Module):
     target_ids = examples[:,0]
     context_ids = examples[:,1]
 
-    target_embeds = self.target_embeddings(target_ids)
-    context_embeds = None
+    context_embeds = self.context_embeddings(target_ids)
+    target_embeds = None
     if train:
-      context_embeds = self.context_embeddings(context_ids)
+      target_embeds = self.target_embeddings(context_ids)
     else:
-      context_embeds = self.target_embeddings(context_ids) # So the same method is used for training and
+      target_embeds = self.context_embeddings(context_ids) # So the same method is used for training and
       # for the equivalent of predicting, when we're evaluating
 
     scores = torch.mul(target_embeds, context_embeds)
@@ -138,7 +138,6 @@ class Word2Vec(nn.Module):
       max_number_epochs,
       learning_rate,
       batch_size,
-      evaluate_every,
       early_stop_delta):
     """ Executes gradient descent to learn the embeddings.
     This is where we switch to tensors: we need the examples to be in a list in order to shuffle them,
@@ -147,7 +146,6 @@ class Word2Vec(nn.Module):
     -> max_number_epochs: int, the maximum number of epochs to train for
     -> batch_size:        int, the number of examples in a batch
     -> learning_rate:     float, the learning rate step when training
-    -> evaluate_every:    int, the number of batches to train on between two evaluations
     -> early_stop_delta:  float, training stops once the loss improves by less than this amount between
                           two evaluations
     <- results:           dict, results of evaluation over time
@@ -161,12 +159,10 @@ class Word2Vec(nn.Module):
       print("number of epochs = " + str(max_number_epochs))
       print("learning rate = " + str(learning_rate))
       print("batch size = " + str(batch_size))
-      print("evaluate every ... batches = " + str(evaluate_every))
       print("early stop delta = " + str(early_stop_delta))
       print("\nTraining...")
 
     batches_seen = 0
-    ep = 0
     results = {}
     results["examples"] = []
     results["loss"] = []
@@ -174,6 +170,7 @@ class Word2Vec(nn.Module):
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
     train_set = self.examples[0:int(len(self.examples)*80/100)] # TODO quel pourcentage?
+    examples_per_epoch = len(train_set)
     eval_set = torch.tensor(self.examples[int(len(self.examples)*80/100):])
 
     for epoch in range(max_number_epochs):
@@ -196,7 +193,7 @@ class Word2Vec(nn.Module):
         spearman_coeff = self.spearman.evaluate()
         results["spearman"].append(spearman_coeff)
 
-        results["examples"].append(batches_seen*batch_size)
+        results["examples"].append(examples_per_epoch*epoch)
 
         if self.verbose:
           print("examples seen = "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
@@ -253,13 +250,12 @@ class Word2Vec(nn.Module):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus, json format, do not forget the extension')
-  parser.add_argument('eval_corpus_path', type=str, default="similarity.txt", help='Path to the corpus of human-scored similarity pairs, txt format, do not forget the extension')
-  parser.add_argument('save_embeddings_path', type=str, default="embeddings.pt", help='Path to the file for the learned embeddings, pt format, do not forget the extension') 
+  parser.add_argument('--eval_corpus_path', type=str, default="similarity_new.txt", help='Path to the corpus of human-scored similarity pairs, txt format, do not forget the extension')
+  parser.add_argument('--save_embeddings_path', type=str, default="embeddings.txt", help='Path to the file for the learned embeddings, txt format by default, do not forget the extension') 
   parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings to be learned')
   parser.add_argument('--max_number_epochs', type=int, default=1000, help='The maximum number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=1000,  help='The number of examples in a batch')
   parser.add_argument('--learning_rate', type=float, default=0.1, help='The learning rate step when training')
-  parser.add_argument('--evaluate_every', type=int, default=10, help='The number of batches to train on between two evaluations')
   parser.add_argument('--early_stop_delta', type=float, default=0, help='Training stops once the loss improves by (less than) this amount between two evaluations')
   parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
   parser.add_argument('--debug', type=bool, default=False, help='Debug mode')
@@ -278,7 +274,6 @@ if __name__ == "__main__":
   results = model.train(batch_size=args.batch_size,
     max_number_epochs=args.max_number_epochs,
     learning_rate=args.learning_rate,
-    evaluate_every=args.evaluate_every,
     early_stop_delta=args.early_stop_delta)
 
   model.save_embeddings(args.save_embeddings_path)

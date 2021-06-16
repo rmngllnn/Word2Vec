@@ -74,8 +74,8 @@ class SpearmanEvaluation:
     <- pvalue: float
     The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
     """
-    first_embeds = self.word2vec.target_embeddings(self.pairs[:,0])
-    second_embeds = self.word2vec.target_embeddings(self.pairs[:,1])
+    first_embeds = self.word2vec.context_embeddings(self.pairs[:,0])
+    second_embeds = self.word2vec.context_embeddings(self.pairs[:,1])
     cos = nn.CosineSimilarity()
     scores = cos(first_embeds, second_embeds)
     correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
