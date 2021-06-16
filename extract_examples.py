@@ -1,8 +1,6 @@
 """ extract_examples.py
 Creates a corpus of examples and its indexes as an ExampleCorpus object, serializes these elements as a
 dict in a json file.
-
-TODO sous-ecahntillonage des mots fréquents
 """
 
 from serialisation import deserialize
@@ -235,7 +233,11 @@ class ExampleCorpus:
                         # if self.debug: print(self.i2w[sentence[target_i]]+","+self.i2w[neg_id]+",0")
                         examples.append((sentence[target_i], neg_id, 0))
         
-        if self.verbose: print("\n"+str(len(examples))+" examples created.")
+        if self.verbose:
+            print("\n"+str(len(examples))+" examples created.")
+            print(len(self.i2w), "words in the vocabulary")
+            total = len([word for word in self._indexed_doc for word in sentence])
+            print(self._occurence_counter["UNK"], "instances of UNK for", total, "total")
         return examples
 
 
@@ -247,7 +249,42 @@ class ExampleCorpus:
         dict["examples"] = self.examples
         dict["i2w"] = self.i2w
         dict["w2i"] = self.w2i
+        parameters = {}
+        parameters["max_vocab_size"] = self.max_vocab_size
+        parameters["context_size"] = self.context_size
+        parameters["number_neg_examples"] = self.number_neg_examples
+        parameters["min_occurences"] = self.min_occurences
+        parameters["sub_sampling"] = self.sub_sampling
+        parameters["neg_sampling"] = self.neg_sampling
+        dict["parameters"] = parameters
         return dict
+
+
+def main_extract_examples(corpus_path="drive/MyDrive/Word2Vec/tokenized_doc/corpus10.json",
+                          save_as="drive/MyDrive/Word2Vec/examples/example10.json",
+                          max_vocab_size=0,
+                          min_occurences=3,
+                          context_size=5,
+                          number_neg_examples=5,
+                          sub_sampling=0.0005,
+                          neg_sampling=0.75,
+                          verbose=True,
+                          debug=bool):
+    """ Main function for google colab.
+    """
+    tokenized_doc = deserialize(corpus_path)
+
+    corpus = ExampleCorpus(tokenized_doc = tokenized_doc,
+        context_size = context_size,
+        neg_sampling = neg_sampling,
+        sub_sampling = sub_sampling,
+        number_neg_examples = number_neg_examples,
+        max_vocab_size = max_vocab_size,
+        min_occurences = min_occurences,
+        verbose = verbose,
+        debug = debug)
+
+    serialize(corpus.to_dict(), save_as)
 
 
 if __name__ == "__main__":
