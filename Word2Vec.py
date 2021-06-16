@@ -96,8 +96,10 @@ class Word2Vec(nn.Module):
     if self.verbose: print("Evaluator initialized.")
     if self.verbose: print("\nReady to train!")
 
+    self.loss_func = nn.BCELoss()
 
-  def forward(self, target_embeds, context_embeds, train=True):
+
+  def forward(self, examples, train=True):
     """ Calculates the probability of an example being found in the corpus, for all examples given.
     That is to say, the probability of a context word being found in the window of a context word.
     P(c|t) = sigmoid(c.t)
@@ -105,10 +107,21 @@ class Word2Vec(nn.Module):
     We'll worry about the gold tags later, when we calculate the loss.
     P(¬c|t) = 1 - P(c|t)
 
-    -> target_embeds
-    -> context_embeds
-    <- scores: tensor, shape: (batch_size), line tensor of scores
+    -> examples: Tensor, examples
+    -> train: bool, whether we're currently trainning or not # TODO could put the no_grad here?
+    <- scores: Tensor, shape: (batch_size), line tensor of scores for each example
     """
+    target_ids = examples[:,0]
+    context_ids = examples[:,1]
+
+    target_embeds = self.target_embeddings(target_ids)
+    context_embeds = None
+    if train:
+      context_embeds = self.context_embeddings(context_ids)
+    else:
+      context_embeds = self.target_embeddings(context_ids) # So the same method is used for training and
+      # for the equivalent of predicting, when we're evaluating
+
     scores = torch.mul(target_embeds, context_embeds)
     #if self.debug: print("mul: "+str(scores))
     scores = torch.sum(scores, dim=1)
@@ -118,51 +131,8 @@ class Word2Vec(nn.Module):
     scores = sig(scores)
     #if self.debug: print("sig: "+str(scores))
 
-    #print(scores)
-
     return scores
 
-
-  def calculate_loss_scores(self, set, train=True):
-    """ Calculates the loss on a set of examples using cross-entropy.
-
-    -> set
-    -> train
-    <- loss
-    < scores
-    """
-    target_ids = set[:,0]
-    context_ids = set[:,1]
-    gold_tags = set[:,2].float()
-
-    target_embeds = self.target_embeddings(target_ids)
-    context_embeds = None
-    if train:
-      context_embeds = self.context_embeddings(context_ids)
-    else:
-      context_embeds = self.target_embeddings(context_ids) # So the same method is used for training and
-      # for the equivalent of predicting
-
-    #if self.debug:
-    #  print("\nCalculate loss and scores on batch.")
-    #  print("Target ids: "+str(target_ids))
-    #  print("Context ids: "+str(context_ids))
-    #  print("Target embeddings: "+str(target_embeds))
-    #  print("Context embeddings: "+str(context_embeds))
-
-    scores = self(target_embeds, context_embeds) # Forward propagation.
-    
-    #loss = torch.sum(torch.abs(gold_tags - scores)) # The loss is the difference between the
-    # probability we want to associate with the example (gold_tag) and the probability measured by
-    # the model (score))
-    # cross-entropy! # TODO loss function
-    # batch_loss = torch.sum((-1)*gold_tags*scores-(1-gold_tags)*(1-scores))
-
-    loss_func = nn.BCELoss()
-    loss = loss_func(scores, gold_tags)
-    
-
-    return loss, scores
 
   def train(self,
       max_number_epochs,
@@ -212,13 +182,15 @@ class Word2Vec(nn.Module):
       
       for batch in batches:
         self.zero_grad() # Reinitialising model gradients.
-        batch_loss, batch_scores = self.calculate_loss_scores(batch)
+        batch_scores = self(batch, train=True) # Forward propagation.
+        batch_loss = self.loss_func(batch_scores, batch[:,2].float()) # Computing loss.
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
         batches_seen += 1
 
       with torch.no_grad(): # We DO NOT want it to count toward training.
-        eval_loss, eval_scores = self.calculate_loss_scores(eval_set)
+        eval_scores = self(eval_set, train=False)
+        eval_loss = self.loss_func(eval_scores, eval_set[:,2].float())
         results["loss"].append(eval_loss.item())
 
         spearman_coeff = self.spearman.evaluate()
