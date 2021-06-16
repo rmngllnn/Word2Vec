@@ -138,6 +138,7 @@ class Word2Vec(nn.Module):
       max_number_epochs,
       learning_rate,
       batch_size,
+      evaluate_every,
       early_stop_delta):
     """ Executes gradient descent to learn the embeddings.
     This is where we switch to tensors: we need the examples to be in a list in order to shuffle them,
@@ -153,16 +154,19 @@ class Word2Vec(nn.Module):
     assert type(max_number_epochs) is int and max_number_epochs > 0, "Problem with max_number_epochs."
     assert type(learning_rate) is float and learning_rate > 0, "Problem with learning_rate."
     assert type(batch_size) is int and batch_size > 0, "Problem with batch_size."
+    assert type(evaluate_every) is int and evaluate_every > 0, "Problem with evaluate_every."
 
     if self.verbose:
       print("\nTraining parameters:")
       print("number of epochs = " + str(max_number_epochs))
       print("learning rate = " + str(learning_rate))
       print("batch size = " + str(batch_size))
+      print("evaluate every ... batches = " + str(evaluate_every))
       print("early stop delta = " + str(early_stop_delta))
       print("\nTraining...")
 
     batches_seen = 0
+    examples_seen = 0
     results = {}
     results["examples"] = []
     results["loss"] = []
@@ -170,7 +174,6 @@ class Word2Vec(nn.Module):
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
     train_set = self.examples[0:int(len(self.examples)*80/100)] # TODO quel pourcentage?
-    examples_per_epoch = len(train_set)
     eval_set = torch.tensor(self.examples[int(len(self.examples)*80/100):])
 
     for epoch in range(max_number_epochs):
@@ -184,33 +187,35 @@ class Word2Vec(nn.Module):
         batch_loss.backward() # Back propagation, computing gradients.
         self.optimizer.step() # One step in gradient descent.
         batches_seen += 1
+        examples_seen = examples_seen + len(batch)
 
-      with torch.no_grad(): # We DO NOT want it to count toward training.
-        eval_scores = self(eval_set, train=False)
-        eval_loss = self.loss_func(eval_scores, eval_set[:,2].float())
-        results["loss"].append(eval_loss.item())
+        if batches_seen % evaluate_every == 0:
+          with torch.no_grad(): # We DO NOT want it to count toward training.
+            eval_scores = self(eval_set, train=False)
+            eval_loss = self.loss_func(eval_scores, eval_set[:,2].float())
+            results["loss"].append(eval_loss.item())
 
-        spearman_coeff = self.spearman.evaluate()
-        results["spearman"].append(spearman_coeff)
+            spearman_coeff = self.spearman.evaluate()
+            results["spearman"].append(spearman_coeff)
 
-        results["examples"].append(examples_per_epoch*epoch)
+            results["examples"].append(examples_seen)
 
-        if self.verbose:
-          print("examples seen = "+str(results["examples"][-1])+", loss = "+str(results["loss"][-1])+", spearman = "+str(results["spearman"][-1]))
+            if self.verbose:
+              print("epoch", epoch, "batch", batches_seen, "example",str(results["examples"][-1]),"\tloss =",str(results["loss"][-1]),"\tspearman =",str(results["spearman"][-1]))
 
-        if len(results["loss"]) > 1 and \
-          (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
-          if self.verbose: print("Training done! Early stopping.")
+            if len(results["loss"]) > 1 and \
+              (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
+              if self.verbose: print("Training done! Early stopping.")
 
-          #Creating plot
-          fig, ax = plt.subplots()
-          ax.plot(results["examples"], results["loss"], "o-")
-          fig.suptitle("loss value according to number of examples")
-          plt.xlabel('Number of examples')
-          plt.ylabel('Loss value')
-          plt.show()
+              #Creating plot
+              fig, ax = plt.subplots()
+              ax.plot(results["examples"], results["loss"], "o-")
+              fig.suptitle("loss value according to number of examples")
+              plt.xlabel('Number of examples')
+              plt.ylabel('Loss value')
+              plt.show()
 
-          return results
+              return results
 
     if self.verbose: print("Training done! Reached max epoch before early stopping condition.")
     fig, ax = plt.subplots()
@@ -255,6 +260,7 @@ if __name__ == "__main__":
   parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings to be learned')
   parser.add_argument('--max_number_epochs', type=int, default=1000, help='The maximum number of epochs to train for')
   parser.add_argument('--batch_size', type=int, default=1000,  help='The number of examples in a batch')
+  parser.add_argument('--evaluate_every', type=int, default=100,  help='The number of batches between two evaluations')
   parser.add_argument('--learning_rate', type=float, default=0.1, help='The learning rate step when training')
   parser.add_argument('--early_stop_delta', type=float, default=0, help='Training stops once the loss improves by (less than) this amount between two evaluations')
   parser.add_argument('--verbose', type=bool, default=True, help='Verbose mode')
@@ -272,6 +278,7 @@ if __name__ == "__main__":
     debug = args.debug)
 
   results = model.train(batch_size=args.batch_size,
+    evaluate_every=args.evaluate_every,
     max_number_epochs=args.max_number_epochs,
     learning_rate=args.learning_rate,
     early_stop_delta=args.early_stop_delta)
