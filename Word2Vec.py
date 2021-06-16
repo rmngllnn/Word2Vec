@@ -2,8 +2,8 @@
 Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
 Generates a graph of the learning curve.
 
-TODO save performance results
-TODO programme python pour tester les différents hyperparamètres
+TODO save performance results?
+TODO programme python EDIT gcolab pour tester les différents hyperparamètres
 TODO README instructions
 TODO rapport (17)
 TODO soutenance (24 Juin 10h40)
@@ -252,9 +252,43 @@ class Word2Vec(nn.Module):
     # TODO save results too?
 
 
+def main_Word2Vec(example_corpus_path="examples.json",
+  eval_corpus_path="similarity_new.txt",
+  save_embeddings_path="embeddings.txt",
+  embedding_dim=100,
+  max_number_epochs=1000,
+  batch_size=1000,
+  evaluate_every=100,
+  learning_rate=0.1,
+  early_stop_delta=0,
+  verbose=True,
+  debug=False):
+  """ Main function for gcolab.
+  """
+  example_dict = deserialize(example_corpus_path)
+
+  model = Word2Vec(examples = example_dict["examples"],
+    i2w = example_dict["i2w"],
+    w2i = example_dict["w2i"],
+    embedding_dim = embedding_dim,
+    eval_corpus_path = eval_corpus_path,
+    verbose = verbose,
+    debug = debug)
+
+  results = model.train(batch_size=batch_size,
+    evaluate_every=evaluate_every,
+    max_number_epochs=max_number_epochs,
+    learning_rate=learning_rate,
+    early_stop_delta=early_stop_delta)
+
+  example_parameters = example_dict["parameters"]
+
+  model.save_embeddings(save_embeddings_path)
+
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
-  parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized tokenized corpus, json format, do not forget the extension')
+  parser.add_argument('example_corpus_path', type=str, default="examples.json", help='Path to the serialized example corpus, json format, do not forget the extension')
   parser.add_argument('--eval_corpus_path', type=str, default="similarity_new.txt", help='Path to the corpus of human-scored similarity pairs, txt format, do not forget the extension')
   parser.add_argument('--save_embeddings_path', type=str, default="embeddings.txt", help='Path to the file for the learned embeddings, txt format by default, do not forget the extension') 
   parser.add_argument('--embedding_dim', type=int, default=100, help='The size of the word embeddings to be learned')
@@ -282,6 +316,8 @@ if __name__ == "__main__":
     max_number_epochs=args.max_number_epochs,
     learning_rate=args.learning_rate,
     early_stop_delta=args.early_stop_delta)
+
+  example_parameters = example_dict["parameters"]
 
   model.save_embeddings(args.save_embeddings_path)
 
