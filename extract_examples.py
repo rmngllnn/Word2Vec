@@ -132,7 +132,7 @@ class ExampleCorpus:
         total_occurences = sum([occurence_counter[word] for word in occurence_counter])
         for word in occurence_counter:
             frequency = occurence_counter[word]/total_occurences
-            if frequency > self.sub_sampling: # TODO Depending on the source consulted, subsampling is applied to all or only frequent words...?
+            if frequency > self.sub_sampling: 
                 proba = 1 - sqrt(self.sub_sampling/frequency) # probability of not keeping
                 # that word.
                 random = rng.random() #  We pick a float number between 0 and 1.
@@ -166,7 +166,7 @@ class ExampleCorpus:
             for i, token in enumerate(sentence):
                     if token not in self.w2i: # If we don't know a word...
                         sentence[i] = "UNK" # we replace it by UNK.
-            known_vocab_doc.append(sentence) # when I tried to change the __tokenized doc directly, the changes got lost, sooo TODO Cécile : look into how referencing works in python again...
+            known_vocab_doc.append(sentence)
 
         # We switch to indexes instead of string tokens.
         indexed_doc = [[self.w2i[token] for token in sentence] for sentence in known_vocab_doc]
