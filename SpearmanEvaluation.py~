@@ -50,7 +50,10 @@ class SpearmanEvaluation:
           scores.append(float(score))
           if self.word2vec.debug: print(word1+" "+word2+" "+score)
 
-    if len(pairs) < 2: print("Careful, Spearman corelation score won't work. Not enough of the word pairs from the similarity corpus are known by the model.")
+    if len(pairs) < 1:
+      print("Careful, Spearman corelation score won't work. Not enough of the word pairs from the similarity corpus are known by the model.")
+      pairs.append([self.word2vec.w2i["UNK"], self.word2vec.w2i["UNK"], 0])
+      scores.append(0.0)
         
     return torch.tensor(pairs), torch.tensor(scores)
 
@@ -74,8 +77,8 @@ class SpearmanEvaluation:
     <- pvalue: float
     The two-sided p-value for a hypothesis test whose null hypothesis is that two sets of data are uncorrelated.
     """
-    first_embeds = self.word2vec.target_embeddings(self.pairs[:,0])
-    second_embeds = self.word2vec.target_embeddings(self.pairs[:,1])
+    first_embeds = self.word2vec.context_embeddings(self.pairs[:,0])
+    second_embeds = self.word2vec.context_embeddings(self.pairs[:,1])
     cos = nn.CosineSimilarity()
     scores = cos(first_embeds, second_embeds)
     correlation, pvalue = stats.spearmanr(self.gold_scores, scores, axis=None, nan_policy="omit")
