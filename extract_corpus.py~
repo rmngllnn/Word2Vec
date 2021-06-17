@@ -2,6 +2,8 @@
 Extracts, tokenizes and serializes a given number of sentences (or all) from the files in a folder.
 Calibrated for the "L'Est Républicain" corpus, see extract_file() and README.
 Warning, be careful to put all the files in one single folder prior to running.
+
+TODO (optionnel) test avec des subfolders ?
 """
 
 import os

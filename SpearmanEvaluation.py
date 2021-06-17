@@ -1,9 +1,6 @@
 """ SpearmanEvaluation.py
 Not meant to be used on its own.
 https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
-
-TODO verbose/debug, mais surtout refaire les commentaires
-TODO corpus plus grand ? trop de UNK
 """
 
 import torch

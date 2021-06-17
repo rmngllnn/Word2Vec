@@ -1,13 +1,11 @@
-"""modify_similarity.py
-Modify the file similarity.txt to get pairs with plurals or/and non plurals.
-Already loaded, no need to run anymore.
-"""
 import argparse
 
+"""
+Modify the file similarity.txt to get pairs with plurals or/and non plurals.
+"""
+
 def create_file(similarity_file) :
-    """Opens the similarity file and create an ameliorated version of it
-    
-    -> similarity_file : String, path to the file"""
+    """Opens the similarity file and create an ameliorated version of it"""
     s = open(similarity_file, 'r', encoding = "utf-8")
     f = open('similarity_new.txt', 'w', encoding = 'utf-8')
     for line in s.readlines() :

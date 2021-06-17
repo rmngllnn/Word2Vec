@@ -1,12 +1,6 @@
 """ Word2Vec.py
 Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
 Generates a graph of the learning curve.
-
-TODO save performance results?
-TODO programme python EDIT gcolab pour tester les différents hyperparamètres
-TODO README instructions
-TODO rapport (17)
-TODO soutenance (24 Juin 10h40)
 """
 
 import torch
@@ -126,7 +120,6 @@ class Word2Vec(nn.Module):
     #if self.debug: print("mul: "+str(scores))
     scores = torch.sum(scores, dim=1)
     #if self.debug: print("sum: "+str(scores))
-    #scores = F.logsigmoid(scores)
     sig = nn.Sigmoid()
     scores = sig(scores)
     #if self.debug: print("sig: "+str(scores))
@@ -249,6 +242,7 @@ class Word2Vec(nn.Module):
 
     NOTE We're not using json serializing because TypeError: Object of type Embedding is not JSON
     serializable
+    NOTE : There are different ways to save the embeddings, we kept them as commentary.
 
     -> save_path: string, path of the file to save as (fotmat .pt)
     """
