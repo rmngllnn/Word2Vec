@@ -88,8 +88,10 @@ class Word2Vec(nn.Module):
     self.context_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True) # NOTE Changed the first dimension from vocab_size to len of vocabulary, because the first is actually the max vocab size and not the actual vocab size
 
     range = 0.5/self.embedding_dim
+    #self.context_embeddings.weight.data.uniform_(-range,range)
     self.context_embeddings.weight.data.uniform_(-0,0)
     self.target_embeddings.weight.data.uniform_(-range,range)
+    #self.target_embeddings.weight.data.uniform_(-0,0)
     if self.verbose: print("\nEmbeddings initialized.")
 
     self.spearman = SpearmanEvaluation(eval_corpus_path, self)
