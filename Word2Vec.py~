@@ -1,12 +1,6 @@
 """ Word2Vec.py
 Learns embeddings from a corpus of examples. Saves the performance results and the learned embeddings.
 Generates a graph of the learning curve.
-
-TODO save performance results?
-TODO programme python EDIT gcolab pour tester les différents hyperparamètres
-TODO README instructions
-TODO rapport (17)
-TODO soutenance (24 Juin 10h40)
 """
 
 import torch
@@ -88,8 +82,10 @@ class Word2Vec(nn.Module):
     self.context_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True) # NOTE Changed the first dimension from vocab_size to len of vocabulary, because the first is actually the max vocab size and not the actual vocab size
 
     range = 0.5/self.embedding_dim
+    #self.context_embeddings.weight.data.uniform_(-range,range)
     self.context_embeddings.weight.data.uniform_(-0,0)
     self.target_embeddings.weight.data.uniform_(-range,range)
+    #self.target_embeddings.weight.data.uniform_(-0,0)
     if self.verbose: print("\nEmbeddings initialized.")
 
     self.spearman = SpearmanEvaluation(eval_corpus_path, self)
@@ -126,7 +122,6 @@ class Word2Vec(nn.Module):
     #if self.debug: print("mul: "+str(scores))
     scores = torch.sum(scores, dim=1)
     #if self.debug: print("sum: "+str(scores))
-    #scores = F.logsigmoid(scores)
     sig = nn.Sigmoid()
     scores = sig(scores)
     #if self.debug: print("sig: "+str(scores))
@@ -249,6 +244,7 @@ class Word2Vec(nn.Module):
 
     NOTE We're not using json serializing because TypeError: Object of type Embedding is not JSON
     serializable
+    NOTE : There are different ways to save the embeddings, we kept them as commentary.
 
     -> save_path: string, path of the file to save as (fotmat .pt)
     """
