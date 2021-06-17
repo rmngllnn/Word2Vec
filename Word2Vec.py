@@ -114,12 +114,12 @@ class Word2Vec(nn.Module):
     target_ids = examples[:,0]
     context_ids = examples[:,1]
 
-    context_embeds = self.context_embeddings(target_ids)
+    context_embeds = self.context_embeddings(context_ids)
     target_embeds = None
     if train:
-      target_embeds = self.target_embeddings(context_ids)
+      target_embeds = self.target_embeddings(target_ids)
     else:
-      target_embeds = self.context_embeddings(context_ids) # So the same method is used for training and
+      target_embeds = self.context_embeddings(target_ids) # So the same method is used for training and
       # for the equivalent of predicting, when we're evaluating
 
     scores = torch.mul(target_embeds, context_embeds)
@@ -337,3 +337,4 @@ if __name__ == "__main__":
   example_parameters = example_dict["parameters"]
 
   model.save_embeddings(args.save_embeddings_path)
+  
