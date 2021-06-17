@@ -23,10 +23,10 @@ Example: python3 extract_corpus.py raw_files_folder tokenized_doc.json --number_
 
 2) run `extract_examples.py` on that file, with whatever hyperparameters you want.
 Help: python3 extract_examples.py -h
-Example: python3 extract_examples.py tokenized_doc.json examples.json --max_vocab_size=0 --min_occurences=5 --sub_sampling=0.001
+Example: python3 extract_examples.py tokenized_doc.json examples.json --max_vocab_size=10000 --min_occurences=5 --sub_sampling=0.001
 
 3) run `Word2Vec.py` on the resulting file.
 Help: python3 Word2Vec.py -h
-Example: python3 Word2Vec.py examples.json similarity.txt embeddings.pt --embedding_dim=200 --early_stop_delta=0.00001
+Example: python3 Word2Vec.py examples.json --eval_corpus_path=similarity_new.txt --save_embeddings_path=embeddings.txt --embedding_dim=200 --early_stop_delta=0.00001
 
 `SpearmanEvaluation.py` et `serialisation.py` are not supposed to run "on their own". They contain auxiliary functions used in the runnable files.

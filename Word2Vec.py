@@ -88,8 +88,8 @@ class Word2Vec(nn.Module):
     self.context_embeddings = nn.Embedding(len(self.i2w), self.embedding_dim, sparse=True) # NOTE Changed the first dimension from vocab_size to len of vocabulary, because the first is actually the max vocab size and not the actual vocab size
 
     range = 0.5/self.embedding_dim
-    self.target_embeddings.weight.data.uniform_(-range,range)
     self.context_embeddings.weight.data.uniform_(-0,0)
+    self.target_embeddings.weight.data.uniform_(-range,range)
     if self.verbose: print("\nEmbeddings initialized.")
 
     self.spearman = SpearmanEvaluation(eval_corpus_path, self)
@@ -170,7 +170,8 @@ class Word2Vec(nn.Module):
     results = {}
     results["examples"] = []
     results["loss"] = []
-    results["spearman"] = []
+    results["correlation"] = []
+    results["pvalue"] = []
     self.optimizer = optim.SGD(self.parameters(), lr=learning_rate)
 
     train_set = self.examples[0:int(len(self.examples)*80/100)] # TODO quel pourcentage?
@@ -196,12 +197,13 @@ class Word2Vec(nn.Module):
             results["loss"].append(eval_loss.item())
 
             spearman_coeff = self.spearman.evaluate()
-            results["spearman"].append(spearman_coeff)
+            results["correlation"].append(spearman_coeff[0])
+            results["pvalue"].append(spearman_coeff[1])
 
             results["examples"].append(examples_seen)
 
             if self.verbose:
-              print("epoch", epoch, "batch", batches_seen, "example",str(results["examples"][-1]),"\tloss =",str(results["loss"][-1]),"\tspearman =",str(results["spearman"][-1]))
+              print("epoch", epoch, "batch", batches_seen, "example",str(results["examples"][-1]),"\tloss =",str(results["loss"][-1]),"\tspearman =",results["correlation"][-1],results["pvalue"][-1])
 
             if len(results["loss"]) > 1 and \
               (results["loss"][-2] - eval_loss) < early_stop_delta: # If learning is slowing down enough...
@@ -213,6 +215,20 @@ class Word2Vec(nn.Module):
               fig.suptitle("loss value according to number of examples")
               plt.xlabel('Number of examples')
               plt.ylabel('Loss value')
+              plt.show()
+
+              fig, ax = plt.subplots()
+              ax.plot(results["examples"], results["correlation"], "o-")
+              fig.suptitle("correlation according to number of examples")
+              plt.xlabel('Number of examples')
+              plt.ylabel('Correlation')
+              plt.show()
+
+              fig, ax = plt.subplots()
+              ax.plot(results["examples"], results["pvalue"], "o-")
+              fig.suptitle("pvalue of spearman evaluation according to number of examples")
+              plt.xlabel('Number of examples')
+              plt.ylabel('Pvalue')
               plt.show()
 
               return results
@@ -302,6 +318,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   example_dict = deserialize(args.example_corpus_path)
+  print("Input:",len(example_dict["examples"]),"examples")
 
   model = Word2Vec(examples = example_dict["examples"],
     i2w = example_dict["i2w"],
@@ -320,4 +337,3 @@ if __name__ == "__main__":
   example_parameters = example_dict["parameters"]
 
   model.save_embeddings(args.save_embeddings_path)
-
