@@ -4,10 +4,10 @@ Romane Gallienne, Cécile Guitel, Romy Rabemihanta
 
 
 
-Dans ce projet, on se propose d'implémenter le modèle word2vec en version SkipGram avec sampling négatif. Un programme d'extraction de corpus est inclus, calibré pour le corpus l'Est Républicain, disponible aux liens suivants :
-http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.a.tgz
-http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.b.tgz
-http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.c.tgz
+Dans ce projet, on se propose d'implémenter le modèle word2vec en version SkipGram avec sampling négatif. Un programme d'extraction de corpus est inclus, calibré pour le corpus l'Est Républicain, disponible aux liens suivants :  
+http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.a.tgz  
+http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.b.tgz  
+http://www.linguist.univ-paris-diderot.fr/~mcandito/divers/EP.tcs.melt.utf8.c.tgz  
 
 Un corpus de scores de similarité est aussi nécéssaire. Son extraction n'est pas incluse. Le fichier similarity.txt correspond au jeu de paires de mots RG65 disponible au format HTM sur le lien suivant : https://www.site.uottawa.ca/~mjoub063/wordsims.htm.
 
